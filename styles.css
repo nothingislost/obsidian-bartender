@@ -1,0 +1,4 @@
+.side-dock-actions .sortable-ghost,
+.status-bar .sortable-ghost {
+  visibility: hidden;
+}
