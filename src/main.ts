@@ -20,7 +20,6 @@ export default class BartenderPlugin extends Plugin {
 
   async onload() {
     await this.loadSettings();
-    this.addRibbonIcon;
     this.patchUninstaller = around(Plugin.prototype, {
       addStatusBarItem(old: any) {
         return function (...args): HTMLElement {
@@ -39,8 +38,10 @@ export default class BartenderPlugin extends Plugin {
     });
     this.register(this.patchUninstaller);
     this.app.workspace.onLayoutReady(() => {
-      this.setStatusBarSorter();
-      this.setRibbonBarSorter();
+      setTimeout(() => {
+        this.setStatusBarSorter();
+        this.setRibbonBarSorter();
+      }, 1000);
     });
     this.registerEvent(
       this.app.workspace.on("ribbon-bar-updated", () => {
