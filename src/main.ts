@@ -1,4 +1,4 @@
-import { Plugin } from "obsidian";
+import { Plugin, Platform } from "obsidian";
 import { around } from "monkey-around";
 import Sortable, { SortableEvent } from "sortablejs";
 
@@ -45,8 +45,8 @@ export default class BartenderPlugin extends Plugin {
     this.register(patchUninstaller);
     this.app.workspace.onLayoutReady(() => {
       setTimeout(() => {
-        this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true);
-        this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false);
+        Platform.isDesktop && this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true);
+        Platform.isDesktop && this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false);
         this.setStatusBarSorter();
         this.setRibbonBarSorter();
       }, 1000);
