@@ -75,6 +75,7 @@ export default class BartenderPlugin extends Plugin {
     let el = document.body.querySelector("body > div.app-container > div.status-bar") as HTMLElement;
     if (el) this.statusBarSorter = Sortable.create(el, {
       animation: 500,
+      delay: 400,
       group: "statusBar",
       store: {
         get: sortable => {
@@ -94,6 +95,7 @@ export default class BartenderPlugin extends Plugin {
     ) as HTMLElement;
     if (el) this.ribbonBarSorter = Sortable.create(el, {
       animation: 500,
+      delay: 300,
       group: "ribbonBar",
       filter: (event, target) => {
         return target.hidden;
