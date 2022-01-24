@@ -3,17 +3,7 @@
   visibility: hidden;
 }
 
-.side-dock-actions > div:first-child {
-  /* to ensure that the ribbon bar doesn't dissapear if the separator is place at position 0 */
-  display: inherit !important;
-}
-
-.status-bar > div:last-child {
-  /* to ensure that the status bar doesn't dissapear if the separator is place at position 0 */
-  display: inherit !important; 
-}
-
-.workspace-ribbon div.separator {
+.side-dock-ribbon div.separator {
   cursor: grab;
   padding: 0px 4px;
   display: flex;
@@ -22,32 +12,43 @@
   height: 1em;
 }
 
-.workspace-ribbon div.separator .line {
+.side-dock-ribbon div.separator .line {
   margin-top: -4px;
   display: flex;
 }
 
-.workspace-ribbon div.separator:hover {
+.side-dock-ribbon div.separator:hover {
   background: none;
 }
 
-.workspace-ribbon div.separator div.line::before {
-  content: "―";
+.side-dock-ribbon div.separator.is-collapsed {
+  transform: rotateX(180deg);
+}
+
+.status-bar div.separator.is-collapsed {
+  transform: rotateY(180deg);
+}
+
+.status-bar .is-hidden,
+.side-dock-ribbon .is-hidden {
+  /* if you're mad about this !important 
+    set the --is-hidden-display variable to override it */
+  --is-hidden-display: none;
+  display: var(--is-hidden-display) !important;
 }
 
 .status-bar div.separator {
   --cursor: grab; /* to deal with minimal theme */
   cursor: grab;
   padding: 0px 4px;
+  display: flex;
+  align-items: center;
+  line-height: 1;
 }
 
-.status-bar div.separator div.line::before {
-  content: "|";
-}
-
-.workspace-ribbon div.side-dock-ribbon-action.sortable-chosen,
-.workspace-ribbon div.separator.sortable-chosen,
+.side-dock-ribbon div.side-dock-ribbon-action.sortable-chosen,
+.side-dock-ribbon div.separator.sortable-chosen,
 .status-bar div.separator.sortable-chosen {
-  --cursor: grabbing; /* to deal with minimal theme */
+  --cursor: grabbing;
   cursor: grabbing;
 }
