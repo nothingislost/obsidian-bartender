@@ -18,24 +18,21 @@ export const DEFAULT_SETTINGS: BartenderSettings = {
 export class SettingTab extends PluginSettingTab {
   plugin: BartenderPlugin;
 
-
   constructor(app: App, plugin: BartenderPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
 
-  hide() { }
+  hide() {}
 
   display(): void {
-		const {containerEl} = this;
+    const { containerEl } = this;
 
-		containerEl.empty();
+    containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
-
-		new Setting(containerEl)
-			.setName('Auto Collapse')
-			.setDesc('Automatically hide items once your mouse leaves the icon container')
+    new Setting(containerEl)
+      .setName("Auto Collapse")
+      .setDesc("Automatically hide items once your mouse leaves the icon container")
       .addToggle(toggle =>
         toggle.setValue(this.plugin.settings.autoHide).onChange(value => {
           this.plugin.settings.autoHide = value;
@@ -44,16 +41,16 @@ export class SettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-    .setName('Auto Collapse Delay')
-    .setDesc('How long to wait before auto collapsing')
-    .addText(textfield => {
-      textfield.setPlaceholder(String(2000));
-      textfield.inputEl.type = "number";
-      textfield.setValue(String(this.plugin.settings.autoHideDelay));
-      textfield.onChange(async value => {
-        this.plugin.settings.autoHideDelay = Number(value);
-        this.plugin.saveSettings();
-      });
+      .setName("Auto Collapse Delay")
+      .setDesc("How long to wait before auto collapsing")
+      .addText(textfield => {
+        textfield.setPlaceholder(String(2000));
+        textfield.inputEl.type = "number";
+        textfield.setValue(String(this.plugin.settings.autoHideDelay));
+        textfield.onChange(async value => {
+          this.plugin.settings.autoHideDelay = Number(value);
+          this.plugin.saveSettings();
+        });
       });
   }
 }

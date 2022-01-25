@@ -1,39 +1,15 @@
-import { Plugin, Platform, setIcon } from "obsidian";
 import { around } from "monkey-around";
-import Sortable, { SortableEvent } from "sortablejs";
+import { Platform, Plugin, setIcon, SplitDirection, Workspace, WorkspaceItem, WorkspaceLeaf } from "obsidian";
+import Sortable from "sortablejs";
 import { BartenderSettings, DEFAULT_SETTINGS, SettingTab } from "./settings";
+import { generateId, getNextSiblings, getPreviousSiblings, move } from "./utils";
 
-const STATUS_BAR_SELECTOR = "body > div.app-container > div.status-bar";
+const STATUS_BAR_SELECTOR = "body > div.app-container div.status-bar";
 const RIBBON_BAR_SELECTOR = "body > div.app-container div.side-dock-actions";
+const RIGHT_SPLIT_TAB_BAR_SELECTOR = ".mod-right-split .workspace-tab-container-inner";
+const LEFT_SPLIT_TAB_BAR_SELECTOR = ".mod-left-split .workspace-tab-container-inner";
 const DRAG_DELAY = 100;
-const ANIMATION_DURATION = 100;
-const AUTO_HIDE_DELAY_MS = 2000;
-
-// SETTINGS
-// Moving the mouse into the menu bar will show hidden items
-// Delay before activating
-
-// Automatically hide items after showing
-
-// Separator icon "<" "..." etc
-
-// Auto hide Separator
-
-function generateId(el: HTMLElement) {
-  var str =
-      el.tagName +
-      el.className?.replace("is-hidden", "").trim() +
-      el.getAttr("aria-label") +
-      el.querySelector("svg")?.className?.baseVal,
-    i = str.length,
-    sum = 0;
-
-  while (i--) {
-    sum += str.charCodeAt(i);
-  }
-
-  return sum.toString(36);
-}
+const ANIMATION_DURATION = 500;
 
 export default class BartenderPlugin extends Plugin {
   statusBarSorter: Sortable;
@@ -46,16 +22,8 @@ export default class BartenderPlugin extends Plugin {
     await this.loadSettings();
     this.registerMonkeyPatches();
     this.registerEventHandlers();
-    this.settingsTab = new SettingTab(this.app, this);
-    this.addSettingTab(this.settingsTab);
-    this.app.workspace.onLayoutReady(() => {
-      setTimeout(() => {
-        this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true);
-        this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false);
-        this.setStatusBarSorter();
-        this.setRibbonBarSorter();
-      }, 1000);
-    });
+    this.registerSettingsTab();
+    this.initialize();
   }
 
   async loadSettings() {
@@ -66,7 +34,38 @@ export default class BartenderPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  initialize() {
+    this.app.workspace.onLayoutReady(() => {
+      setTimeout(() => {
+        if (Platform.isDesktop) {
+          this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true);
+          this.setStatusBarSorter();
+          this.setTabBarSorter();
+        }
+        this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false);
+        this.setRibbonBarSorter();
+      }, 1000);
+    });
+  }
+
+  registerSettingsTab() {
+    this.settingsTab = new SettingTab(this.app, this);
+    this.addSettingTab(this.settingsTab);
+  }
+
   registerEventHandlers() {
+    this.registerEvent(
+      this.app.workspace.on("bartender-leaf-split", (originLeaf: WorkspaceItem, newLeaf: WorkspaceItem) => {
+        let elements: HTMLElement[] = [newLeaf.tabsInnerEl as HTMLElement];
+        this.setTabBarSorter(elements);
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on("bartender-workspace-change", () => {
+        this.setTabBarSorter();
+      })
+    );
+
     this.registerEvent(
       this.app.workspace.on("ribbon-bar-updated", () => {
         setTimeout(() => {
@@ -90,68 +89,116 @@ export default class BartenderPlugin extends Plugin {
   }
 
   registerMonkeyPatches() {
-    let patchUninstaller = around(Plugin.prototype, {
-      addStatusBarItem(old: any) {
-        return function (...args): HTMLElement {
-          const result = old.call(this, ...args);
-          this.app.workspace.trigger("status-bar-updated");
-          console.log("status bar reg", this);
-          return result;
-        };
-      },
-      addRibbonIcon(old: any) {
-        return function (...args): HTMLElement {
-          const result = old.call(this, ...args);
-          this.app.workspace.trigger("ribbon-bar-updated");
-          console.log("ribbon bar reg", this);
-          return result;
-        };
-      },
-    });
-    this.register(patchUninstaller);
+    if (Platform.isDesktop) {
+      this.register(
+        around(HTMLDivElement.prototype, {
+          addEventListener(old: any) {
+            return function (
+              type: string,
+              listener: EventListenerOrEventListenerObject,
+              options?: boolean | AddEventListenerOptions
+            ) {
+              if (type === "mousedown" && listener instanceof Function && this.hasClass("workspace-tab-header")) {
+                let origListener = listener;
+                listener = event => {
+                  if (event instanceof MouseEvent && event?.ctrlKey) return;
+                  else origListener(event);
+                };
+              }
+              const result = old.call(this, type, listener, options);
+              return result;
+            };
+          },
+        })
+      );
+    }
+    this.register(
+      around(Workspace.prototype, {
+        splitLeaf(old: any) {
+          return function (
+            source: WorkspaceItem,
+            newLeaf: WorkspaceItem,
+            direction?: SplitDirection,
+            before?: boolean,
+            ...args
+          ) {
+            let result = old.call(this, source, newLeaf, direction, before, ...args);
+            this.trigger("bartender-leaf-split", source, newLeaf);
+            return result;
+          };
+        },
+        changeLayout(old: any) {
+          return async function (workspace: any, ...args): Promise<void> {
+            let result = await old.call(this, workspace, ...args);
+            this.trigger("bartender-workspace-change");
+            return result;
+          };
+        },
+      })
+    );
+    this.register(
+      around(Plugin.prototype, {
+        addStatusBarItem(old: any) {
+          return function (...args): HTMLElement {
+            const result = old.call(this, ...args);
+            this.app.workspace.trigger("status-bar-updated");
+            return result;
+          };
+        },
+        addRibbonIcon(old: any) {
+          return function (...args): HTMLElement {
+            const result = old.call(this, ...args);
+            this.app.workspace.trigger("ribbon-bar-updated");
+            return result;
+          };
+        },
+      })
+    );
   }
-  insertSeparator(selector: string, className: string, rtl: Boolean) {
-    let el = document.body.querySelector(selector) as HTMLElement;
-    let getSiblings = rtl ? getPreviousSiblings : getNextSiblings;
-    if (el) {
-      let separator = el.createDiv(`${className} separator`);
-      rtl && el.prepend(separator);
-      let line = separator.createDiv("line");
-      let glyph = rtl ? "right-arrow" : "up-chevron-glyph";
-      setIcon(line, glyph);
 
-      separator.addClass("is-collapsed");
-      this.register(() => separator.detach());
-      let hideTimeout: NodeJS.Timeout;
-      separator.onClickEvent((event: MouseEvent) => {
-        if (separator.hasClass("is-collapsed")) {
-          Array.from(el.children).forEach(el => el.removeClass("is-hidden"));
-          separator.removeClass("is-collapsed");
-        } else {
-          getSiblings(separator).forEach(el => el.addClass("is-hidden"));
-          separator.addClass("is-collapsed");
-        }
-      });
-      el.onmouseenter = ev => {
-        hideTimeout && clearTimeout(hideTimeout);
-        // separator.removeClass("is-hidden");
-        // getSiblings(separator).forEach(el => el.show());
-      };
-      el.onmouseleave = ev => {
-        if (this.settings.autoHide) {
-          hideTimeout = setTimeout(() => {
+  insertSeparator(selector: string, className: string, rtl: Boolean) {
+    let elements = document.body.querySelectorAll(selector);
+    let multiElement = false;
+    if (elements.length > 1) {
+      multiElement = true;
+    }
+    elements.forEach((el: HTMLElement) => {
+      let getSiblings = rtl ? getPreviousSiblings : getNextSiblings;
+      if (el) {
+        let separator = el.createDiv(`${className} separator`);
+        rtl && el.prepend(separator);
+        let line = separator.createDiv("line");
+        let glyph = rtl ? "right-arrow" : "up-chevron-glyph";
+        setIcon(line, glyph);
+        separator.addClass("is-collapsed");
+        this.register(() => separator.detach());
+        let hideTimeout: NodeJS.Timeout;
+        separator.onClickEvent((event: MouseEvent) => {
+          if (separator.hasClass("is-collapsed")) {
+            Array.from(el.children).forEach(el => el.removeClass("is-hidden"));
+            separator.removeClass("is-collapsed");
+          } else {
             getSiblings(separator).forEach(el => el.addClass("is-hidden"));
             separator.addClass("is-collapsed");
-            // separator.addClass("is-hidden");
-          }, this.settings.autoHideDelay);
-        }
-      };
-      setTimeout(() => {
-        getSiblings(separator).forEach(el => el.addClass("is-hidden"));
-        separator.addClass("is-collapsed");
-        // separator.addClass("is-hidden");
-      }, 0);
-    }
+          }
+        });
+        el.onmouseenter = ev => {
+          hideTimeout && clearTimeout(hideTimeout);
+        };
+        el.onmouseleave = ev => {
+          if (this.settings.autoHide) {
+            hideTimeout = setTimeout(() => {
+              getSiblings(separator).forEach(el => el.addClass("is-hidden"));
+              separator.addClass("is-collapsed");
+            }, this.settings.autoHideDelay);
+          }
+        };
+        setTimeout(() => {
+          getSiblings(separator).forEach(el => el.addClass("is-hidden"));
+          separator.addClass("is-collapsed");
+        }, 0);
+      }
+    });
   }
 
   setElementIDs(parentEl: HTMLElement) {
@@ -160,6 +207,46 @@ export default class BartenderPlugin extends Plugin {
         if (!child.getAttribute("data-id")) {
           child.setAttribute("data-id", generateId(child));
         }
+      }
+    });
+  }
+
+  setTabBarSorter(elements?: NodeListOf<Element> | HTMLElement[]) {
+    if (!elements) {
+      elements = document.body.querySelectorAll(".workspace-tab-container-inner");
+    }
+    elements.forEach((el: HTMLElement) => {
+      if (el) {
+        this.setElementIDs(el);
+        let sorter = Sortable.create(el, {
+          group: "leftTabBar",
+          dataIdAttr: "data-id",
+          delay: 0,
+          animation: ANIMATION_DURATION,
+          onStart: () => {
+            el.querySelector(".separator")?.removeClass("is-collapsed");
+            Array.from(el.children).forEach(el => el.removeClass("is-hidden"));
+          },
+          onEnd: event => {
+            let targetLeaf: unknown;
+            this.app.workspace.iterateAllLeaves(leaf => {
+              if (leaf.tabHeaderEl === event.item) {
+                targetLeaf = leaf;
+              }
+            });
+            if (targetLeaf instanceof WorkspaceLeaf) {
+              const { parentSplit } = targetLeaf;
+              let targetLeafIndex = parentSplit.children.indexOf(targetLeaf);
+              if (event.oldIndex !== undefined && event.newIndex !== undefined) {
+                move(parentSplit.children, event.oldIndex, event.newIndex);
+                parentSplit.currentTab = event.newIndex;
+                parentSplit.recomputeChildrenDimensions();
+              }
+              this.app.workspace.requestSaveLayout();
+            }
+          },
+        });
+        this.register(() => sorter.destroy());
       }
     });
   }
@@ -220,22 +307,4 @@ export default class BartenderPlugin extends Plugin {
     this.statusBarSorter?.destroy();
     this.ribbonBarSorter?.destroy();
   }
-}
-
-function getPreviousSiblings(el: HTMLElement, filter?: (el: HTMLElement) => boolean): HTMLElement[] {
-  var sibs = [];
-  while ((el = el.previousSibling as HTMLElement)) {
-    if (el.nodeType === 3) continue; // text node
-    if (!filter || filter(el)) sibs.push(el);
-  }
-  return sibs;
-}
-
-function getNextSiblings(el: HTMLElement, filter?: (el: HTMLElement) => boolean): HTMLElement[] {
-  var sibs = [];
-  while ((el = el.nextSibling as HTMLElement)) {
-    if (el.nodeType === 3) continue; // text node
-    if (!filter || filter(el)) sibs.push(el);
-  }
-  return sibs;
 }
