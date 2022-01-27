@@ -1,4 +1,5 @@
 import "obsidian";
+import Sortable from "sortablejs";
 
 declare module "obsidian" {
   export interface Workspace extends Events {
@@ -11,16 +12,29 @@ declare module "obsidian" {
       ctx?: any
     ): EventRef;
   }
+  interface View {
+    actionsEl: HTMLElement;
+    iconSorter?: Sortable;
+  }
   interface WorkspaceLeaf {
     tabHeaderEl: HTMLElement;
     parentSplit: WorkspaceSplit;
+    iconSorter?: Sortable;
   }
   interface WorkspaceSplit {
-    children: WorkspaceLeaf[];
-    currentTab: number;
-    recomputeChildrenDimensions(): void;
+    children: WorkspaceTabs[];
   }
   interface WorkspaceItem {
     tabsInnerEl: HTMLElement;
+    view: View;
+    type: string;
+  }
+  interface WorkspaceTabs {
+    children: WorkspaceLeaf[];
+    component: Component;
+    currentTab: number;
+    iconSorter?: Sortable;
+    recomputeChildrenDimensions(): void;
+    updateDecorativeCurves(): void;
   }
 }
