@@ -25,7 +25,7 @@ div.separator svg {
   background-color: currentColor;
 }
 
-.side-dock-ribbon div.separator .line {
+.side-dock-ribbon div.separator .glyph {
   /* margin-top: -4px; */
   display: flex;
   align-self: flex-end;
@@ -53,7 +53,7 @@ div.separator svg {
   height: 26px;
 }
 
-.hider-ribbon .side-dock-ribbon div.separator .line {
+.hider-ribbon .side-dock-ribbon div.separator .glyph {
   display: flex;
   align-self: flex-end;
 }
@@ -88,6 +88,10 @@ div.separator svg {
   display: flex;
   align-items: center;
   /* line-height: 1; */
+}
+
+.status-bar div.separator .glyph {
+  display: flex;
 }
 
 .status-bar div.separator svg,
