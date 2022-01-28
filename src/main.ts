@@ -73,7 +73,7 @@ export default class BartenderPlugin extends Plugin {
             leaf.view.iconSorter = this.setViewActionSorter(leaf.view.actionsEl, leaf.view);
           }
         });
-      }, 10);
+      }, 1000); // give time for plugins like Customizable Page Header to add their icons
     });
   }
 
