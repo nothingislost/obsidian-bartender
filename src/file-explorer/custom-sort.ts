@@ -1,0 +1,121 @@
+import { Menu, TAbstractFile, TFile, TFolder } from "obsidian";
+
+let Collator = new Intl.Collator(undefined, {
+  usage: "sort",
+  sensitivity: "base",
+  numeric: true,
+}).compare;
+
+let Sorter = {
+  alphabetical: function (first: TFile, second: TFile) {
+    return Collator(first.basename, second.basename);
+  },
+  alphabeticalReverse: function (first: TFile, second: TFile) {
+    return -Sorter.alphabetical(first, second);
+  },
+  byModifiedTime: function (first: TFile, second: TFile) {
+    return second.stat.mtime - first.stat.mtime;
+  },
+  byModifiedTimeReverse: function (first: TFile, second: TFile) {
+    return -Sorter.byModifiedTime(first, second);
+  },
+  byCreatedTime: function (first: TFile, second: TFile) {
+    return second.stat.ctime - first.stat.ctime;
+  },
+  byCreatedTimeReverse: function (first: TFile, second: TFile) {
+    return -Sorter.byCreatedTime(first, second);
+  },
+};
+
+const Translate = i18next.t.bind(i18next);
+
+const SortGlyph = "up-and-down-arrows";
+
+const sortOptionStrings = {
+  alphabetical: "plugins.file-explorer.label-sort-a-to-z",
+  alphabeticalReverse: "plugins.file-explorer.label-sort-z-to-a",
+  byModifiedTime: "plugins.file-explorer.label-sort-new-to-old",
+  byModifiedTimeReverse: "plugins.file-explorer.label-sort-old-to-new",
+  byCreatedTime: "plugins.file-explorer.label-sort-created-new-to-old",
+  byCreatedTimeReverse: "plugins.file-explorer.label-sort-created-old-to-new",
+  custom: "Custom",
+};
+const sortOptionGroups = [
+  ["alphabetical", "alphabeticalReverse"],
+  ["byModifiedTime", "byModifiedTimeReverse"],
+  ["byCreatedTime", "byCreatedTimeReverse"],
+  ["custom"],
+];
+
+export const folderSort = function (order: string[], foldersOnBottom?: boolean) {
+  let fileExplorer = this.fileExplorer,
+    folderContents = this.file.children.slice();
+  folderContents.sort(function (firstEl: TFile | TFolder, secondEl: TFile | TFolder) {
+    let firstIsFolder, secondIsFolder;
+    if (
+      foldersOnBottom &&
+      ((firstIsFolder = firstEl instanceof TFolder) || (secondIsFolder = secondEl instanceof TFolder))
+    ) {
+      return firstIsFolder && !secondIsFolder
+        ? 1
+        : secondIsFolder && !firstIsFolder
+        ? -1
+        : Collator(firstEl.name, secondEl.name);
+    } else {
+      if (!order) return Collator(firstEl.name, secondEl.name);
+
+      const index1 = order.indexOf(firstEl.path);
+      const index2 = order.indexOf(secondEl.path);
+
+      return (index1 > -1 ? index1 : Infinity) - (index2 > -1 ? index2 : Infinity);
+    }
+  });
+  /* Get all the file items that are children of the current folder. */
+
+  this.children = folderContents
+    .map((child: TAbstractFile) => fileExplorer.fileItems[child.path])
+    .filter((f: TAbstractFile) => f);
+};
+
+export const addSortButton = function (sorter: any, sortOption: any) {
+  let _this = this;
+  return this.addNavButton(
+    SortGlyph,
+    Translate("plugins.file-explorer.action-change-sort"),
+    function (event: MouseEvent) {
+      event.preventDefault();
+      let menu = new Menu(_this.app);
+      for (
+        let currentSortOption = sortOption(), groupIndex = 0, _sortOptionGroups = sortOptionGroups;
+        groupIndex < _sortOptionGroups.length;
+        groupIndex++
+      ) {
+        for (
+          let addMenuItem = function (_sortOption: any) {
+              //@ts-ignore
+              let label = Translate(sortOptionStrings[_sortOption]);
+              menu.addItem(function (item) {
+                return item
+                  .setTitle(label)
+                  .setActive(_sortOption === currentSortOption)
+                  .onClick(function () {
+                    if (_sortOption !== currentSortOption) {
+                      _this.app.workspace.trigger("file-explorer-sort-change", _sortOption);
+                    }
+                    sorter(_sortOption);
+                  });
+              });
+            },
+            itemIndex = 0,
+            sortOptionGroup = _sortOptionGroups[groupIndex];
+          itemIndex < sortOptionGroup.length;
+          itemIndex++
+        ) {
+          addMenuItem(sortOptionGroup[itemIndex]);
+        }
+        menu.addSeparator();
+      }
+      menu.showAtMouseEvent(event);
+    }
+  );
+};

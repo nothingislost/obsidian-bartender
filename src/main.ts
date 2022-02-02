@@ -1,19 +1,28 @@
 import { around } from "monkey-around";
 import {
+  ChildElement,
+  FileExplorerView,
   Platform,
   Plugin,
+  RootElements,
   setIcon,
   SplitDirection,
+  TFolder,
+  Vault,
   View,
+  ViewCreator,
   Workspace,
   WorkspaceItem,
   WorkspaceLeaf,
   WorkspaceSplit,
-  WorkspaceTabs,
+  WorkspaceTabs
 } from "obsidian";
-import Sortable from "sortablejs";
+import Sortable, { MultiDrag } from "sortablejs";
+import { addSortButton, folderSort } from "./file-explorer/custom-sort";
 import { BartenderSettings, DEFAULT_SETTINGS, SettingTab } from "./settings";
-import { generateId, GenIdOptions, getNextSiblings, getPreviousSiblings, move } from "./utils";
+import { generateId, GenerateIdOptions, getNextSiblings, getPreviousSiblings, reorderArray } from "./utils";
+
+Sortable.mount(new MultiDrag());
 
 const STATUS_BAR_SELECTOR = "body > div.app-container div.status-bar";
 const RIBBON_BAR_SELECTOR = "body > div.app-container div.side-dock-actions";
@@ -25,6 +34,7 @@ const ANIMATION_DURATION = 500;
 export default class BartenderPlugin extends Plugin {
   statusBarSorter: Sortable;
   ribbonBarSorter: Sortable;
+  fileSorter: Sortable;
   separator: HTMLElement;
   settings: BartenderSettings;
   settingsTab: SettingTab;
@@ -45,35 +55,67 @@ export default class BartenderPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
+  patchFileExplorerFolder() {
+    let plugin = this;
+    let leaf = this.app.workspace.getLeaf();
+    let fileExplorer = this.app.viewRegistry.viewByType["file-explorer"](leaf) as FileExplorerView;
+    // @ts-ignore
+    let tmpFolder = new TFolder(Vault, "");
+    let Folder = fileExplorer.createFolderDom(tmpFolder).constructor;
+    this.register(
+      around(Folder.prototype, {
+        sort(old: any) {
+          return function (...args: any[]) {
+            let order = plugin.settings.fileExplorerOrder[this.file.path];
+            let result;
+            if (this.fileExplorer.sortOrder === "custom") {
+              result = folderSort.call(this, order, ...args);
+            } else {
+              result = old.call(this, ...args);
+            }
+            return result;
+          };
+        },
+      })
+    );
+  }
+
   initialize() {
     this.app.workspace.onLayoutReady(() => {
-      setTimeout(() => {
-        if (Platform.isDesktop) {
-          // add sorter to the status bar
-          this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true, 16);
-          this.setStatusBarSorter();
+      this.patchFileExplorerFolder();
+      setTimeout(
+        () => {
+          if (Platform.isDesktop) {
+            // add sorter to the status bar
+            this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true, 16);
+            this.setStatusBarSorter();
 
-          // add sorter to the sidebar tabs
-          let left = (this.app.workspace.leftSplit as WorkspaceSplit).children;
-          let right = (this.app.workspace.rightSplit as WorkspaceSplit).children;
-          left.concat(right).forEach(child => {
-            if (child.hasOwnProperty("tabsInnerEl") && !child.iconSorter) {
-              child.iconSorter = this.setTabBarSorter(child.tabsInnerEl, child);
+            // add sorter to the sidebar tabs
+            let left = (this.app.workspace.leftSplit as WorkspaceSplit).children;
+            let right = (this.app.workspace.rightSplit as WorkspaceSplit).children;
+            left.concat(right).forEach(child => {
+              if (child.hasOwnProperty("tabsInnerEl") && !child.iconSorter) {
+                child.iconSorter = this.setTabBarSorter(child.tabsInnerEl, child);
+              }
+            });
+          }
+
+          // add file explorer sorter
+          this.setFileExplorerSorter();
+
+          // add sorter to the left sidebar ribbon
+          this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false, 18);
+          this.setRibbonBarSorter();
+
+          // add sorter to all view actions icon groups
+          this.app.workspace.iterateRootLeaves(leaf => {
+            if (leaf?.view?.hasOwnProperty("actionsEl") && !leaf?.view?.hasOwnProperty("iconSorter")) {
+              leaf.view.iconSorter = this.setViewActionSorter(leaf.view.actionsEl, leaf.view);
             }
           });
-        }
-
-        // add sorter to the left sidebar ribbon
-        this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false, 18);
-        this.setRibbonBarSorter();
-
-        // add sorter to all view actions icon groups
-        this.app.workspace.iterateRootLeaves(leaf => {
-          if (leaf?.view?.hasOwnProperty("actionsEl") && !leaf?.view?.hasOwnProperty("iconSorter")) {
-            leaf.view.iconSorter = this.setViewActionSorter(leaf.view.actionsEl, leaf.view);
-          }
-        });
-      }, 1000); // give time for plugins like Customizable Page Header to add their icons
+        },
+        Platform.isMobile ? 3000 : 400
+      ); // give time for plugins like Customizable Page Header to add their icons
     });
   }
 
@@ -83,6 +125,24 @@ export default class BartenderPlugin extends Plugin {
   }
 
   registerEventHandlers() {
+    this.registerEvent(
+      this.app.workspace.on("file-explorer-sort-change", (sortMethod: string) => {
+        if (sortMethod === "custom") {
+          setTimeout(() => {
+            this.setFileExplorerSorter();
+          }, 10);
+        } else {
+          this.cleanupFileExplorerSorters();
+        }
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on("file-explorer-load", (fileExplorer: FileExplorerView) => {
+        setTimeout(() => {
+          this.setFileExplorerSorter(fileExplorer);
+        }, 1000);
+      })
+    );
     this.registerEvent(
       this.app.workspace.on("bartender-leaf-split", (originLeaf: WorkspaceItem, newLeaf: WorkspaceItem) => {
         let element: HTMLElement = newLeaf.tabsInnerEl as HTMLElement;
@@ -116,6 +176,46 @@ export default class BartenderPlugin extends Plugin {
 
   registerMonkeyPatches() {
     const plugin = this;
+    this.register(
+      around(this.app.viewRegistry.constructor.prototype, {
+        registerView(old: any) {
+          return function (type: string, viewCreator: ViewCreator, ...args: unknown[]) {
+            plugin.app.workspace.trigger("view-registered", type, viewCreator);
+            return old.call(this, type, viewCreator, ...args);
+          };
+        },
+      })
+    );
+    let eventRef = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
+      if (type !== "file-explorer") return;
+      this.app.workspace.offref(eventRef);
+      // @ts-ignore
+      let leaf = new WorkspaceLeaf(plugin.app);
+      let FileExplorer = viewCreator(leaf) as FileExplorerView;
+      if (FileExplorer) {
+        this.register(
+          around(FileExplorer.headerDom.constructor.prototype, {
+            addSortButton(old: any) {
+              return function (...args: any[]) {
+                return addSortButton.call(this, ...args);
+              };
+            },
+          })
+        );
+        FileExplorer.constructor.prototype.requestSort = this.register(
+          around(FileExplorer.constructor.prototype, {
+            requestSort(old: any) {
+              return function (...args: any[]) {
+                let result = old.call(this, ...args);
+                plugin.app.workspace.trigger("file-explorer-load", this);
+
+                return result;
+              };
+            },
+          })
+        );
+      }
+    });
     this.register(
       around(View.prototype, {
         onunload(old: any) {
@@ -257,7 +357,7 @@ export default class BartenderPlugin extends Plugin {
     });
   }
 
-  setElementIDs(parentEl: HTMLElement, options: GenIdOptions) {
+  setElementIDs(parentEl: HTMLElement, options: GenerateIdOptions) {
     Array.from(parentEl.children).forEach(child => {
       if (child instanceof HTMLElement) {
         if (!child.getAttribute("data-id")) {
@@ -286,7 +386,7 @@ export default class BartenderPlugin extends Plugin {
       onEnd: event => {
         document.body.removeClass("is-dragging");
         if (event.oldIndex !== undefined && event.newIndex !== undefined) {
-          move(leaf.children, event.oldIndex, event.newIndex);
+          reorderArray(leaf.children, event.oldIndex, event.newIndex);
           leaf.currentTab = event.newIndex;
           leaf.recomputeChildrenDimensions();
         }
@@ -334,6 +434,7 @@ export default class BartenderPlugin extends Plugin {
       group: "actionBar",
       dataIdAttr: "data-id",
       delay: DRAG_DELAY,
+      sort: true,
       animation: ANIMATION_DURATION,
       onStart: () => {
         el.querySelector(".separator")?.removeClass("is-collapsed");
@@ -381,6 +482,105 @@ export default class BartenderPlugin extends Plugin {
     }
   }
 
+  setFileExplorerSorter(fileExplorer?: FileExplorerView) {
+    if (!fileExplorer) fileExplorer = this.getFileExplorer();
+    if (!fileExplorer || fileExplorer.sortOrder !== "custom" || fileExplorer.hasCustomSorter) return;
+    let roots = this.getRootFolders(fileExplorer);
+    if (!roots || !roots.length) return;
+    for (let root of roots) {
+      let el = root?.childrenEl;
+      if (!el) continue;
+      let draggedItems: HTMLElement[];
+      fileExplorer.hasCustomSorter = true;
+      root.sorter = Sortable.create(el!, {
+        group: "fileExplorer" + root.file.path,
+        multiDrag: true,
+        // @ts-ignore
+        multiDragKey: "alt",
+        // selectedClass: "is-selected",
+        delay: 0,
+        animation: ANIMATION_DURATION,
+        onStart: evt => {
+          if (evt.items.length) {
+            draggedItems = evt.items;
+          } else {
+            draggedItems = [evt.item];
+          }
+        },
+        onMove: evt => {
+          if (!root.children || !draggedItems?.length) return;
+          let children = root.children.map(child => child.el);
+          let adjacentEl = evt.related;
+          // root.children = move(root.children, children.indexOf(items[0]), children.indexOf(adjacentEl), items.length);
+          let targetIndex = children.indexOf(adjacentEl);
+          let firstItem = draggedItems.first();
+          if (!firstItem) return;
+          let firstItemIndex = children.indexOf(firstItem);
+          let _draggedItems: HTMLElement[];
+          if (firstItemIndex < targetIndex) _draggedItems = draggedItems.slice();
+          else _draggedItems = draggedItems.slice().reverse();
+          for (let item of _draggedItems) {
+            let itemIndex = children.indexOf(item);
+            root.children = reorderArray(root.children, itemIndex, targetIndex);
+            children = reorderArray(children, itemIndex, targetIndex);
+          }
+          this.settings.fileExplorerOrder[root.file.path] = root.children.map(child => child.file.path);
+          this.saveSettings();
+        },
+        onEnd: evt => {
+          draggedItems = [];
+        },
+      });
+    }
+  }
+
+  getFileExplorer() {
+    let fileExplorer: FileExplorerView | undefined = this.app.workspace.getLeavesOfType("file-explorer")?.first()
+      ?.view as unknown as FileExplorerView;
+    return fileExplorer;
+  }
+
+  getRootFolders(fileExplorer?: FileExplorerView): [RootElements | ChildElement] | undefined {
+    if (!fileExplorer) fileExplorer = this.getFileExplorer();
+    if (!fileExplorer) return;
+    let root = fileExplorer.dom?.infinityScroll?.rootEl;
+    let roots = root && this.traverseRoots(root);
+    return roots;
+  }
+
+  traverseRoots(root: RootElements | ChildElement, items?: [RootElements | ChildElement]) {
+    if (!items) items = [root];
+    for (let child of root.children || []) {
+      if (child.children) items.push(child);
+      this.traverseRoots(child, items);
+    }
+    return items;
+  }
+
+  cleanupFileExplorerSorters() {
+    let fileExplorer = this.getFileExplorer();
+    let roots = this.getRootFolders(fileExplorer);
+    if (roots?.length) {
+      for (let root of roots) {
+        if (root.sorter) {
+          root.sorter.destroy();
+          delete root.sorter;
+          Object.keys(root.childrenEl!).forEach(
+            key => key.startsWith("Sortable") && delete (root.childrenEl as any)[key]
+          );
+          // sortable.destroy removes all of the draggble attributes :( so we put them back
+          root
+            .childrenEl!.querySelectorAll("div.nav-file-title")
+            .forEach((el: HTMLDivElement) => (el.draggable = true));
+          root
+            .childrenEl!.querySelectorAll("div.nav-folder-title")
+            .forEach((el: HTMLDivElement) => (el.draggable = true));
+        }
+      }
+    }
+    delete fileExplorer.hasCustomSorter;
+  }
+
   onunload(): void {
     this.statusBarSorter?.destroy();
     this.ribbonBarSorter?.destroy();
@@ -395,11 +595,12 @@ export default class BartenderPlugin extends Plugin {
         try {
           sorterParent.iconSorter?.destroy();
         } catch (err) {
-          // console.log(err);
         } finally {
           delete sorterParent.iconSorter;
         }
       }
     });
+    // clean up file explorer sorters
+    this.cleanupFileExplorerSorters();
   }
 }

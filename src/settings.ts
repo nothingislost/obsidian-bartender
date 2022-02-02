@@ -4,6 +4,7 @@ import BartenderPlugin from "./main";
 export interface BartenderSettings {
   statusBarOrder: string[];
   ribbonBarOrder: string[];
+  fileExplorerOrder: Record<string, string[]>;
   actionBarOrder: Record<string, string[]>;
   autoHide: boolean;
   autoHideDelay: number;
@@ -12,6 +13,7 @@ export interface BartenderSettings {
 export const DEFAULT_SETTINGS: BartenderSettings = {
   statusBarOrder: [],
   ribbonBarOrder: [],
+  fileExplorerOrder: {},
   actionBarOrder: {},
   autoHide: false,
   autoHideDelay: 2000,
