@@ -508,17 +508,17 @@ export default class BartenderPlugin extends Plugin {
           }
         },
         onMove: evt => {
+          // TODO: Refactor this
+          // Responsible for updating the internal Obsidian array that contains the file item order
+          // Without this logic, reordering is ephemeral and will be undone by Obisidian's native processes
           if (!root.children || !draggedItems?.length) return;
           let children = root.children.map(child => child.el);
           let adjacentEl = evt.related;
-          // root.children = move(root.children, children.indexOf(items[0]), children.indexOf(adjacentEl), items.length);
           let targetIndex = children.indexOf(adjacentEl);
           let firstItem = draggedItems.first();
-          if (!firstItem) return;
-          let firstItemIndex = children.indexOf(firstItem);
-          let _draggedItems: HTMLElement[];
-          if (firstItemIndex < targetIndex) _draggedItems = draggedItems.slice();
-          else _draggedItems = draggedItems.slice().reverse();
+          let firstItemIndex = children.indexOf(firstItem!);
+          let _draggedItems = draggedItems.slice();
+          if (firstItemIndex > targetIndex) _draggedItems.reverse();
           for (let item of _draggedItems) {
             let itemIndex = children.indexOf(item);
             root.children = reorderArray(root.children, itemIndex, targetIndex);
@@ -526,6 +526,7 @@ export default class BartenderPlugin extends Plugin {
           }
           this.settings.fileExplorerOrder[root.file.path] = root.children.map(child => child.file.path);
           this.saveSettings();
+          return !adjacentEl.hasClass('nav-folder');
         },
         onEnd: evt => {
           draggedItems = [];
