@@ -17,6 +17,7 @@ declare module "obsidian" {
     on(name: "view-registered", callback: (type: string, viewCreator: ViewCreator) => any, ctx?: any): EventRef;
     on(name: "file-explorer-load", callback: (fileExplorer: FileExplorerView) => any, ctx?: any): EventRef;
     on(name: "file-explorer-sort-change", callback: (sortMethod: string) => any, ctx?: any): EventRef;
+    on(name: "infinity-scroll-compute", callback: (infinityScroll: InfinityScroll) => any, ctx?: any): EventRef;
   }
   export interface PluginInstance {
     id: string;
@@ -56,10 +57,15 @@ declare module "obsidian" {
   }
   export interface InfinityScroll {
     rootEl: RootElements;
+    scrollEl: HTMLElement;
+    filtered: boolean;
+    filter: string;
+    compute(): void;
   }
   export interface RootElements {
     childrenEl: HTMLElement;
     children: ChildElement[];
+    _children: ChildElement[];
     file: TAbstractFile;
     sorter: Sortable;
     fileExplorer: FileExplorerView;

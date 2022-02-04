@@ -1,3 +1,4 @@
+import Fuse from "fuse.js";
 import { Menu, TAbstractFile, TFile, TFolder } from "obsidian";
 
 let Collator = new Intl.Collator(undefined, {
@@ -40,6 +41,7 @@ const sortOptionStrings = {
   byCreatedTimeReverse: "plugins.file-explorer.label-sort-created-old-to-new",
   custom: "Custom",
 };
+
 const sortOptionGroups = [
   ["alphabetical", "alphabeticalReverse"],
   ["byModifiedTime", "byModifiedTimeReverse"],
@@ -70,7 +72,6 @@ export const folderSort = function (order: string[], foldersOnBottom?: boolean) 
       return (index1 > -1 ? index1 : Infinity) - (index2 > -1 ? index2 : Infinity);
     }
   });
-  /* Get all the file items that are children of the current folder. */
 
   this.children = folderContents
     .map((child: TAbstractFile) => fileExplorer.fileItems[child.path])
@@ -91,8 +92,7 @@ export const addSortButton = function (sorter: any, sortOption: any) {
         groupIndex++
       ) {
         for (
-          let addMenuItem = function (_sortOption: any) {
-              //@ts-ignore
+          let addMenuItem = function (_sortOption: keyof typeof sortOptionStrings) {
               let label = Translate(sortOptionStrings[_sortOption]);
               menu.addItem(function (item) {
                 return item
@@ -111,7 +111,7 @@ export const addSortButton = function (sorter: any, sortOption: any) {
           itemIndex < sortOptionGroup.length;
           itemIndex++
         ) {
-          addMenuItem(sortOptionGroup[itemIndex]);
+          addMenuItem(sortOptionGroup[itemIndex] as keyof typeof sortOptionStrings);
         }
         menu.addSeparator();
       }

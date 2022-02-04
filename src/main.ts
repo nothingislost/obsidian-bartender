@@ -2,6 +2,7 @@ import { around } from "monkey-around";
 import {
   ChildElement,
   FileExplorerView,
+  InfinityScroll,
   Platform,
   Plugin,
   RootElements,
@@ -15,12 +16,21 @@ import {
   WorkspaceItem,
   WorkspaceLeaf,
   WorkspaceSplit,
-  WorkspaceTabs
+  WorkspaceTabs,
 } from "obsidian";
 import Sortable, { MultiDrag } from "sortablejs";
 import { addSortButton, folderSort } from "./file-explorer/custom-sort";
 import { BartenderSettings, DEFAULT_SETTINGS, SettingTab } from "./settings";
-import { generateId, GenerateIdOptions, getNextSiblings, getPreviousSiblings, reorderArray } from "./utils";
+import {
+  generateId,
+  GenerateIdOptions,
+  getItems,
+  getNextSiblings,
+  getPreviousSiblings,
+  highlight,
+  reorderArray,
+} from "./utils";
+import Fuse from "fuse.js";
 
 Sortable.mount(new MultiDrag());
 
@@ -67,13 +77,11 @@ export default class BartenderPlugin extends Plugin {
         sort(old: any) {
           return function (...args: any[]) {
             let order = plugin.settings.fileExplorerOrder[this.file.path];
-            let result;
             if (this.fileExplorer.sortOrder === "custom") {
-              result = folderSort.call(this, order, ...args);
+              return folderSort.call(this, order, ...args);
             } else {
-              result = old.call(this, ...args);
+              return old.call(this, ...args);
             }
-            return result;
           };
         },
       })
@@ -123,6 +131,49 @@ export default class BartenderPlugin extends Plugin {
     this.settingsTab = new SettingTab(this.app, this);
     this.addSettingTab(this.settingsTab);
   }
+
+  clearFileExplorerFilter() {
+    const fileExplorer = this.getFileExplorer();
+    let fileExplorerFilterEl: HTMLInputElement | null = document.body.querySelector(
+      '.workspace-leaf-content[data-type="file-explorer"] .nav-buttons-container .search-input-container>input'
+    );
+    fileExplorerFilterEl && (fileExplorerFilterEl.value = "");
+    fileExplorer.dom.infinityScroll.filter = "";
+    fileExplorer.dom.infinityScroll.compute();
+  }
+
+  fileExplorerFilter = function () {
+    let fileExplorer = this?.rootEl?.fileExplorer;
+
+    if (!fileExplorer) return;
+
+    if (this.filter?.length >= 1) {
+      if (!this.filtered) {
+        this.rootEl._children = this.rootEl.children;
+        this.filtered = true;
+      }
+      const options = {
+        includeScore: true,
+        includeMatches: true,
+        useExtendedSearch: true,
+        threshold: 0.2,
+        keys: ["file.path"],
+      };
+      let flattenedItems = getItems(this.rootEl._children);
+      const fuse = new Fuse(flattenedItems, options);
+      let results = fuse.search(this.filter).slice(0, 200);
+      // this.rootEl.children = highlight(results);
+      this.rootEl.children = results.map(result => result.item);
+    } else if (this.filter?.length < 1) {
+      if (this.rootEl._children) {
+        this.rootEl.children = this.rootEl._children;
+      }
+      document.body
+        .querySelectorAll(".has-matches")
+        .forEach(match => match.textContent && match.setText(match.textContent));
+      this.filtered = false;
+    }
+  };
 
   registerEventHandlers() {
     this.registerEvent(
@@ -189,27 +240,34 @@ export default class BartenderPlugin extends Plugin {
     let eventRef = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
       if (type !== "file-explorer") return;
       this.app.workspace.offref(eventRef);
-      // @ts-ignore
+      // @ts-ignore we need a leaf before any leafs exists in the workspace, so we create one from scratch
       let leaf = new WorkspaceLeaf(plugin.app);
       let FileExplorer = viewCreator(leaf) as FileExplorerView;
       if (FileExplorer) {
+        let InfinityScroll = FileExplorer.dom.infinityScroll.constructor;
+        // register clear first so that it gets called first onunload
+        this.register(() => this.clearFileExplorerFilter());
         this.register(
-          around(FileExplorer.headerDom.constructor.prototype, {
-            addSortButton(old: any) {
+          around(InfinityScroll.prototype, {
+            compute(old: any) {
               return function (...args: any[]) {
-                return addSortButton.call(this, ...args);
+                try {
+                  if (this.scrollEl.hasClass("nav-files-container")) {
+                    plugin.fileExplorerFilter.call(this);
+                  }
+                } catch {}
+                const result = old.call(this, ...args);
+                return result;
               };
             },
           })
         );
-        FileExplorer.constructor.prototype.requestSort = this.register(
-          around(FileExplorer.constructor.prototype, {
-            requestSort(old: any) {
+        this.register(
+          around(FileExplorer.headerDom.constructor.prototype, {
+            addSortButton(old: any) {
               return function (...args: any[]) {
-                let result = old.call(this, ...args);
-                plugin.app.workspace.trigger("file-explorer-load", this);
-
-                return result;
+                plugin.setFileExplorerFilter();
+                return addSortButton.call(this, ...args);
               };
             },
           })
@@ -482,6 +540,21 @@ export default class BartenderPlugin extends Plugin {
     }
   }
 
+  setFileExplorerFilter() {
+    let fileExplorerNav = document.body.querySelector(
+      '.workspace-leaf-content[data-type="file-explorer"] .nav-buttons-container'
+    )!;
+    if (fileExplorerNav) {
+      let fileExplorerFilterInput = fileExplorerNav.createDiv("search-input-container").createEl("input");
+      fileExplorerFilterInput.type = "text";
+      fileExplorerFilterInput.oninput = (ev: InputEvent) => {
+        let fileExplorer = this.getFileExplorer();
+        if (ev.target instanceof HTMLInputElement) fileExplorer.dom.infinityScroll.filter = ev.target?.value;
+        fileExplorer.dom.infinityScroll.compute();
+      };
+    }
+  }
+
   setFileExplorerSorter(fileExplorer?: FileExplorerView) {
     if (!fileExplorer) fileExplorer = this.getFileExplorer();
     if (!fileExplorer || fileExplorer.sortOrder !== "custom" || fileExplorer.hasCustomSorter) return;
@@ -526,7 +599,7 @@ export default class BartenderPlugin extends Plugin {
           }
           this.settings.fileExplorerOrder[root.file.path] = root.children.map(child => child.file.path);
           this.saveSettings();
-          return !adjacentEl.hasClass('nav-folder');
+          return !adjacentEl.hasClass("nav-folder");
         },
         onEnd: evt => {
           draggedItems = [];
