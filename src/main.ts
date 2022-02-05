@@ -20,7 +20,7 @@ import {
 } from "obsidian";
 import Sortable, { MultiDrag } from "sortablejs";
 import { addSortButton, folderSort } from "./file-explorer/custom-sort";
-import { BartenderSettings, DEFAULT_SETTINGS, SettingTab } from "./settings";
+import { BartenderSettings, DEFAULT_SETTINGS, SettingTab } from "./settings/settings";
 import {
   generateId,
   GenerateIdOptions,
@@ -36,8 +36,6 @@ Sortable.mount(new MultiDrag());
 
 const STATUS_BAR_SELECTOR = "body > div.app-container div.status-bar";
 const RIBBON_BAR_SELECTOR = "body > div.app-container div.side-dock-actions";
-const VIEW_ACTION_SELECTOR = "body > div.app-container div.view-actions";
-const SIDE_SPLIT_TAB_BAR_SELECTOR = "body > div.app-container .workspace-tab-container-inner";
 const DRAG_DELAY = Platform.isMobile ? 200 : 20;
 const ANIMATION_DURATION = 500;
 
@@ -176,6 +174,11 @@ export default class BartenderPlugin extends Plugin {
   };
 
   registerEventHandlers() {
+    this.registerEvent(
+      this.app.workspace.on("file-explorer-draggable-change", value => {
+        this.toggleFileExplorerSorters(value);
+      })
+    );
     this.registerEvent(
       this.app.workspace.on("file-explorer-sort-change", (sortMethod: string) => {
         if (sortMethod === "custom") {
@@ -556,6 +559,8 @@ export default class BartenderPlugin extends Plugin {
   }
 
   setFileExplorerSorter(fileExplorer?: FileExplorerView) {
+    // TODO: Register sorter on new folder creation
+    // TODO: Unregister sorter on folder deletion
     if (!fileExplorer) fileExplorer = this.getFileExplorer();
     if (!fileExplorer || fileExplorer.sortOrder !== "custom" || fileExplorer.hasCustomSorter) return;
     let roots = this.getRootFolders(fileExplorer);
@@ -572,6 +577,7 @@ export default class BartenderPlugin extends Plugin {
         multiDragKey: "alt",
         // selectedClass: "is-selected",
         delay: 0,
+        sort: false, // init with dragging disabled. the nav bar button will toggle on/off
         animation: ANIMATION_DURATION,
         onStart: evt => {
           if (evt.items.length) {
@@ -599,10 +605,11 @@ export default class BartenderPlugin extends Plugin {
           }
           this.settings.fileExplorerOrder[root.file.path] = root.children.map(child => child.file.path);
           this.saveSettings();
-          return !adjacentEl.hasClass("nav-folder");
+          // return !adjacentEl.hasClass("nav-folder");
         },
         onEnd: evt => {
           draggedItems = [];
+          document.querySelector("body>div.drag-ghost")?.detach();
         },
       });
     }
@@ -629,6 +636,18 @@ export default class BartenderPlugin extends Plugin {
       this.traverseRoots(child, items);
     }
     return items;
+  }
+
+  toggleFileExplorerSorters(enable: boolean) {
+    let fileExplorer = this.getFileExplorer();
+    let roots = this.getRootFolders(fileExplorer);
+    if (roots?.length) {
+      for (let root of roots) {
+        if (root.sorter) {
+          root.sorter.option("sort", enable);
+        }
+      }
+    }
   }
 
   cleanupFileExplorerSorters() {

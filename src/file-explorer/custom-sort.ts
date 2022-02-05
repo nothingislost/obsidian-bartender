@@ -79,13 +79,31 @@ export const folderSort = function (order: string[], foldersOnBottom?: boolean) 
 };
 
 export const addSortButton = function (sorter: any, sortOption: any) {
-  let _this = this;
+  let plugin = this;
+  this.addNavButton("three-horizontal-bars", "Drag to rearrange", function (event: MouseEvent) {
+    event.preventDefault();
+    let value = !this.hasClass("is-active");
+    this.toggleClass("is-active", value);
+    plugin.app.workspace.trigger("file-explorer-draggable-change", value);
+  });
+  this.addNavButton("search", "Filter items", function (event: MouseEvent) {
+    event.preventDefault();
+    let value = !this.hasClass("is-active");
+    this.toggleClass("is-active", value);
+    let filterEl = this.parentElement?.querySelector(".search-input-container > input");
+    filterEl?.parentElement.toggleClass("is-active", value);
+    if (!value) {
+      filterEl.value = "";
+      filterEl.dispatchEvent(new Event("input"));
+    }
+    plugin.app.workspace.trigger("file-explorer-draggable-change", value);
+  });
   return this.addNavButton(
     SortGlyph,
     Translate("plugins.file-explorer.action-change-sort"),
     function (event: MouseEvent) {
       event.preventDefault();
-      let menu = new Menu(_this.app);
+      let menu = new Menu(plugin.app);
       for (
         let currentSortOption = sortOption(), groupIndex = 0, _sortOptionGroups = sortOptionGroups;
         groupIndex < _sortOptionGroups.length;
@@ -100,7 +118,7 @@ export const addSortButton = function (sorter: any, sortOption: any) {
                   .setActive(_sortOption === currentSortOption)
                   .onClick(function () {
                     if (_sortOption !== currentSortOption) {
-                      _this.app.workspace.trigger("file-explorer-sort-change", _sortOption);
+                      plugin.app.workspace.trigger("file-explorer-sort-change", _sortOption);
                     }
                     sorter(_sortOption);
                   });

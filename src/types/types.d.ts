@@ -18,6 +18,8 @@ declare module "obsidian" {
     on(name: "file-explorer-load", callback: (fileExplorer: FileExplorerView) => any, ctx?: any): EventRef;
     on(name: "file-explorer-sort-change", callback: (sortMethod: string) => any, ctx?: any): EventRef;
     on(name: "infinity-scroll-compute", callback: (infinityScroll: InfinityScroll) => any, ctx?: any): EventRef;
+    on(name: "file-explorer-draggable-change", callback: (dragEnabled: boolean) => any, ctx?: any): EventRef;
+    on(name: "file-explorer-filter-change", callback: (filterEnabled: boolean) => any, ctx?: any): EventRef;
   }
   export interface PluginInstance {
     id: string;
@@ -46,6 +48,7 @@ declare module "obsidian" {
     headerDom: FileExplorerHeader;
     sortOrder: string;
     hasCustomSorter?: boolean;
+    dragEnabled: boolean;
   }
   interface FileExplorerHeader {
     addSortButton(sorter: (sortType: string) => void, sortOrder: () => string): void;

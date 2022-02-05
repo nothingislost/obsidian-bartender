@@ -1,5 +1,5 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
-import BartenderPlugin from "./main";
+import BartenderPlugin from "../main";
 
 export interface BartenderSettings {
   statusBarOrder: string[];
