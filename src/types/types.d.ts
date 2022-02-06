@@ -52,6 +52,7 @@ declare module "obsidian" {
   }
   interface FileExplorerHeader {
     addSortButton(sorter: (sortType: string) => void, sortOrder: () => string): void;
+    navHeaderEl: HTMLElement;
   }
   interface FileExplorerFolder {}
   export interface FileExplorerViewDom {

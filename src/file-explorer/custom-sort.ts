@@ -80,25 +80,7 @@ export const folderSort = function (order: string[], foldersOnBottom?: boolean) 
 
 export const addSortButton = function (sorter: any, sortOption: any) {
   let plugin = this;
-  this.addNavButton("three-horizontal-bars", "Drag to rearrange", function (event: MouseEvent) {
-    event.preventDefault();
-    let value = !this.hasClass("is-active");
-    this.toggleClass("is-active", value);
-    plugin.app.workspace.trigger("file-explorer-draggable-change", value);
-  });
-  this.addNavButton("search", "Filter items", function (event: MouseEvent) {
-    event.preventDefault();
-    let value = !this.hasClass("is-active");
-    this.toggleClass("is-active", value);
-    let filterEl = this.parentElement?.querySelector(".search-input-container > input");
-    filterEl?.parentElement.toggleClass("is-active", value);
-    if (!value) {
-      filterEl.value = "";
-      filterEl.dispatchEvent(new Event("input"));
-    }
-    plugin.app.workspace.trigger("file-explorer-draggable-change", value);
-  });
-  return this.addNavButton(
+  let sortEl = this.addNavButton(
     SortGlyph,
     Translate("plugins.file-explorer.action-change-sort"),
     function (event: MouseEvent) {
@@ -118,6 +100,7 @@ export const addSortButton = function (sorter: any, sortOption: any) {
                   .setActive(_sortOption === currentSortOption)
                   .onClick(function () {
                     if (_sortOption !== currentSortOption) {
+                      sortEl.setAttribute("data-sort-method", _sortOption);
                       plugin.app.workspace.trigger("file-explorer-sort-change", _sortOption);
                     }
                     sorter(_sortOption);
@@ -136,4 +119,32 @@ export const addSortButton = function (sorter: any, sortOption: any) {
       menu.showAtMouseEvent(event);
     }
   );
+  setTimeout(() => {
+    sortEl.setAttribute("data-sort-method", sortOption());
+  }, 100);
+  this.addNavButton("three-horizontal-bars", "Drag to rearrange", function (event: MouseEvent) {
+    event.preventDefault();
+    let value = !this.hasClass("is-active");
+    this.toggleClass("is-active", value);
+    plugin.app.workspace.trigger("file-explorer-draggable-change", value);
+  }).addClass("drag-to-rearrange");
+  this.addNavButton("search", "Filter items", function (event: MouseEvent) {
+    event.preventDefault();
+    let value = !this.hasClass("is-active");
+    this.toggleClass("is-active", value);
+    let filterEl = document.body.querySelector(
+      '.workspace-leaf-content[data-type="file-explorer"] .search-input-container > input'
+    ) as HTMLInputElement;
+
+    if (filterEl && !value) {
+      filterEl.parentElement?.hide();
+      filterEl.value = "";
+      filterEl.dispatchEvent(new Event("input"));
+    } else {
+      filterEl?.parentElement?.show();
+      filterEl?.focus();
+    }
+    plugin.app.workspace.trigger("file-explorer-draggable-change", value);
+  });
+  return sortEl;
 };

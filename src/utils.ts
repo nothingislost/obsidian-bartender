@@ -68,20 +68,20 @@ export function reorderArray(array: any[], from: number, to: number, on = 1) {
   return array.splice(to, 0, ...array.splice(from, on)), array;
 }
 
-
 // flatten infinity scroll root elements
 
 export const getItems = (items: ChildElement[]): ChildElement[] => {
   let children: any[] = [];
 
   return items
-    .map((m) => {
-      if (m.children && m.children.length) {
-        m.children.forEach((i: any) => (i.titleInnerEl as HTMLElement).setAttribute("parent-folder", m.file.path));
-        children = [...children, ...m.children];
+    .reduce((res, item) => {
+      if (item.children) {
+        if (item.children.length) children = [...children, ...item.children];
+      } else {
+        res.push(item);
       }
-      return m;
-    })
+      return res;
+    }, [] as ChildElement[])
     .concat(children.length ? getItems(children) : children);
 };
 
@@ -102,25 +102,15 @@ export const highlight = (fuseSearchResult: any, highlightClassName: string = "s
   };
 
   const generateHighlightedText = (inputText: string, regions: number[][] = []) => {
-    let content = "";
-    let nextUnhighlightedRegionStartingIndex = 0;
+    let result = regions
+      .reduce((str, [start, end]) => {
+        str[start] = `<span class="${highlightClassName}">${str[start]}`;
+        str[end] = `${str[end]}</span>`;
+        return str;
+      }, inputText.split(""))
+      .join("");
 
-    regions.forEach(region => {
-      const lastRegionNextIndex = region[1] + 1;
-
-      content += [
-        inputText.substring(nextUnhighlightedRegionStartingIndex, region[0]),
-        `<span class="${highlightClassName}">`,
-        inputText.substring(region[0], lastRegionNextIndex),
-        "</span>",
-      ].join("");
-
-      nextUnhighlightedRegionStartingIndex = lastRegionNextIndex;
-    });
-
-    content += inputText.substring(nextUnhighlightedRegionStartingIndex);
-
-    return content;
+    return result;
   };
 
   return fuseSearchResult
@@ -129,11 +119,8 @@ export const highlight = (fuseSearchResult: any, highlightClassName: string = "s
       const highlightedItem = { ...item };
 
       matches.forEach((match: any) => {
-        set(
-          highlightedItem,
-          "titleInnerEl.innerHTML",
-          generateHighlightedText(match.value.replace(/\.md$/, ""), match.indices)
-        );
+        if (!highlightedItem.titleInnerEl.origContent) highlightedItem.titleInnerEl.origContent = highlightedItem.titleInnerEl.textContent;
+        set(highlightedItem, "titleInnerEl.innerHTML", generateHighlightedText(match.value, match.indices));
         highlightedItem.titleInnerEl?.addClass("has-matches");
       });
 

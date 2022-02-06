@@ -1,6 +1,7 @@
 import { around } from "monkey-around";
 import {
   ChildElement,
+  FileExplorerHeader,
   FileExplorerView,
   InfinityScroll,
   Platform,
@@ -133,7 +134,7 @@ export default class BartenderPlugin extends Plugin {
   clearFileExplorerFilter() {
     const fileExplorer = this.getFileExplorer();
     let fileExplorerFilterEl: HTMLInputElement | null = document.body.querySelector(
-      '.workspace-leaf-content[data-type="file-explorer"] .nav-buttons-container .search-input-container>input'
+      '.workspace-leaf-content[data-type="file-explorer"] .search-input-container > input'
     );
     fileExplorerFilterEl && (fileExplorerFilterEl.value = "");
     fileExplorer.dom.infinityScroll.filter = "";
@@ -159,16 +160,25 @@ export default class BartenderPlugin extends Plugin {
       };
       let flattenedItems = getItems(this.rootEl._children);
       const fuse = new Fuse(flattenedItems, options);
-      let results = fuse.search(this.filter).slice(0, 200);
-      // this.rootEl.children = highlight(results);
-      this.rootEl.children = results.map(result => result.item);
-    } else if (this.filter?.length < 1) {
+      const maxResults = 200;
+      let results = fuse.search(this.filter).slice(0, maxResults);
+      this.rootEl.children = highlight(results);
+    } else if (this.filter?.length < 1 && this.filtered) {
       if (this.rootEl._children) {
         this.rootEl.children = this.rootEl._children;
       }
-      document.body
-        .querySelectorAll(".has-matches")
-        .forEach(match => match.textContent && match.setText(match.textContent));
+      setTimeout(() => {
+        document.body
+          .querySelectorAll("div.nav-file-title-content.has-matches")
+          .forEach(
+            match => {
+              match.origContent && match.setText(match.origContent);
+              delete match.origContent;
+              match.removeClass("has-matches");
+            }
+          );
+      }, 10);
+
       this.filtered = false;
     }
   };
@@ -240,43 +250,25 @@ export default class BartenderPlugin extends Plugin {
         },
       })
     );
-    let eventRef = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
-      if (type !== "file-explorer") return;
-      this.app.workspace.offref(eventRef);
-      // @ts-ignore we need a leaf before any leafs exists in the workspace, so we create one from scratch
-      let leaf = new WorkspaceLeaf(plugin.app);
-      let FileExplorer = viewCreator(leaf) as FileExplorerView;
-      if (FileExplorer) {
-        let InfinityScroll = FileExplorer.dom.infinityScroll.constructor;
-        // register clear first so that it gets called first onunload
-        this.register(() => this.clearFileExplorerFilter());
-        this.register(
-          around(InfinityScroll.prototype, {
-            compute(old: any) {
-              return function (...args: any[]) {
-                try {
-                  if (this.scrollEl.hasClass("nav-files-container")) {
-                    plugin.fileExplorerFilter.call(this);
-                  }
-                } catch {}
-                const result = old.call(this, ...args);
-                return result;
-              };
-            },
-          })
-        );
-        this.register(
-          around(FileExplorer.headerDom.constructor.prototype, {
-            addSortButton(old: any) {
-              return function (...args: any[]) {
-                plugin.setFileExplorerFilter();
-                return addSortButton.call(this, ...args);
-              };
-            },
-          })
-        );
-      }
-    });
+    // This catches the initial FE view registration so that we can patch the sort button creation logic before
+    // the button is created
+    // TODO: Add conditional logic to patch the sort button even if we don't catch the initial startup
+    // 1) If layout ready, get the existing FE instance, create a patched button, and hide the existing button
+    // 2) Patch `addSortButton` to emit an event
+    // 3) On event,
+    if (!this.app.workspace.layoutReady) { 
+      let eventRef = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
+        if (type !== "file-explorer") return;
+        this.app.workspace.offref(eventRef);
+        // @ts-ignore we need a leaf before any leafs exists in the workspace, so we create one from scratch
+        let leaf = new WorkspaceLeaf(plugin.app);
+        let fileExplorer = viewCreator(leaf) as FileExplorerView;
+        this.patchFileExplorer(fileExplorer);
+      });
+    } else {
+      let fileExplorer = this.getFileExplorer();
+      this.patchFileExplorer(fileExplorer);
+    }
     this.register(
       around(View.prototype, {
         onunload(old: any) {
@@ -374,6 +366,44 @@ export default class BartenderPlugin extends Plugin {
         },
       })
     );
+  }
+
+  patchFileExplorer(fileExplorer: FileExplorerView) {
+    let plugin = this;
+    if (fileExplorer) {
+      let InfinityScroll = fileExplorer.dom.infinityScroll.constructor;
+      // register clear first so that it gets called first onunload
+      this.register(() => this.clearFileExplorerFilter());
+      this.register(
+        around(InfinityScroll.prototype, {
+          compute(old: any) {
+            return function (...args: any[]) {
+              try {
+                if (this.scrollEl.hasClass("nav-files-container")) {
+                  plugin.fileExplorerFilter.call(this);
+                }
+              } catch {}
+              const result = old.call(this, ...args);
+              return result;
+            };
+          },
+        })
+      );
+      this.register(
+        around(fileExplorer.headerDom.constructor.prototype, {
+          addSortButton(old: any) {
+            return function (...args: any[]) {
+              if (this.navHeaderEl?.parentElement?.dataset?.type === "file-explorer") {
+                plugin.setFileExplorerFilter(this);
+                return addSortButton.call(this, ...args);
+              } else {
+                return old.call(this, ...args);
+              }
+            };
+          },
+        })
+      );
+    }
   }
 
   insertSeparator(selector: string, className: string, rtl: Boolean, glyphSize: number = 16) {
@@ -543,18 +573,35 @@ export default class BartenderPlugin extends Plugin {
     }
   }
 
-  setFileExplorerFilter() {
-    let fileExplorerNav = document.body.querySelector(
-      '.workspace-leaf-content[data-type="file-explorer"] .nav-buttons-container'
-    )!;
+  setFileExplorerFilter(headerDom: FileExplorerHeader) {
+    let fileExplorerNav = headerDom.navHeaderEl;
     if (fileExplorerNav) {
-      let fileExplorerFilterInput = fileExplorerNav.createDiv("search-input-container").createEl("input");
+      let fileExplorerFilter = fileExplorerNav.createDiv("search-input-container");
+      fileExplorerNav.insertAdjacentElement("afterend", fileExplorerFilter);
+      let fileExplorerFilterInput = fileExplorerFilter.createEl("input");
+      fileExplorerFilterInput.placeholder = "Type to filter...";
       fileExplorerFilterInput.type = "text";
+      fileExplorerFilter.hide();
       fileExplorerFilterInput.oninput = (ev: InputEvent) => {
         let fileExplorer = this.getFileExplorer();
-        if (ev.target instanceof HTMLInputElement) fileExplorer.dom.infinityScroll.filter = ev.target?.value;
+        if (ev.target instanceof HTMLInputElement) {
+          if (ev.target.value.length) {
+            clearButtonEl.show();
+          } else {
+            clearButtonEl.hide();
+          }
+          fileExplorer.dom.infinityScroll.filter = ev.target.value;
+        }
         fileExplorer.dom.infinityScroll.compute();
       };
+      let clearButtonEl = fileExplorerFilter.createDiv("search-input-clear-button", function (el) {
+        el.addEventListener("click", function () {
+          (fileExplorerFilterInput.value = ""), clearButtonEl.hide();
+          fileExplorerFilterInput.focus();
+          fileExplorerFilterInput.dispatchEvent(new Event("input"));
+        }),
+          el.hide();
+      });
     }
   }
 
@@ -570,6 +617,9 @@ export default class BartenderPlugin extends Plugin {
       if (!el) continue;
       let draggedItems: HTMLElement[];
       fileExplorer.hasCustomSorter = true;
+      let dragEnabled = document.body.querySelector("div.nav-action-button.drag-to-rearrange")?.hasClass("is-active")
+        ? true
+        : false;
       root.sorter = Sortable.create(el!, {
         group: "fileExplorer" + root.file.path,
         multiDrag: true,
@@ -577,7 +627,7 @@ export default class BartenderPlugin extends Plugin {
         multiDragKey: "alt",
         // selectedClass: "is-selected",
         delay: 0,
-        sort: false, // init with dragging disabled. the nav bar button will toggle on/off
+        sort: dragEnabled, // init with dragging disabled. the nav bar button will toggle on/off
         animation: ANIMATION_DURATION,
         onStart: evt => {
           if (evt.items.length) {
