@@ -155,8 +155,8 @@ export default class BartenderPlugin extends Plugin {
         includeScore: true,
         includeMatches: true,
         useExtendedSearch: true,
-        threshold: 0.2,
-        keys: ["file.path"],
+        threshold: 0.3,
+        keys: ["file.name", "file.path"],
       };
       let flattenedItems = getItems(this.rootEl._children);
       const fuse = new Fuse(flattenedItems, options);
@@ -167,17 +167,15 @@ export default class BartenderPlugin extends Plugin {
       if (this.rootEl._children) {
         this.rootEl.children = this.rootEl._children;
       }
-      setTimeout(() => {
-        document.body
-          .querySelectorAll("div.nav-file-title-content.has-matches")
-          .forEach(
-            match => {
-              match.origContent && match.setText(match.origContent);
-              delete match.origContent;
-              match.removeClass("has-matches");
-            }
-          );
-      }, 10);
+
+      let flattenedItems = getItems(this.rootEl._children);
+      flattenedItems.map((match: ChildElement) => {
+        if ((<any>match).titleInnerEl.origContent) {
+          match.titleInnerEl.setText((<any>match).titleInnerEl.origContent);
+          delete (<any>match).titleInnerEl.origContent;
+          match.titleInnerEl.removeClass("has-matches");
+        }
+      });
 
       this.filtered = false;
     }
@@ -256,7 +254,7 @@ export default class BartenderPlugin extends Plugin {
     // 1) If layout ready, get the existing FE instance, create a patched button, and hide the existing button
     // 2) Patch `addSortButton` to emit an event
     // 3) On event,
-    if (!this.app.workspace.layoutReady) { 
+    if (!this.app.workspace.layoutReady) {
       let eventRef = this.app.workspace.on("view-registered", (type: string, viewCreator: ViewCreator) => {
         if (type !== "file-explorer") return;
         this.app.workspace.offref(eventRef);
@@ -626,7 +624,7 @@ export default class BartenderPlugin extends Plugin {
         // @ts-ignore
         multiDragKey: "alt",
         // selectedClass: "is-selected",
-        delay: 0,
+        delay: Platform.isMobile ? 200 : 0,
         sort: dragEnabled, // init with dragging disabled. the nav bar button will toggle on/off
         animation: ANIMATION_DURATION,
         onStart: evt => {

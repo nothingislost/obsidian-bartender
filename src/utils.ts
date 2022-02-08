@@ -117,7 +117,6 @@ export const highlight = (fuseSearchResult: any, highlightClassName: string = "s
     .filter(({ matches }: any) => matches && matches.length)
     .map(({ item, matches }: any) => {
       const highlightedItem = { ...item };
-
       matches.forEach((match: any) => {
         if (!highlightedItem.titleInnerEl.origContent) highlightedItem.titleInnerEl.origContent = highlightedItem.titleInnerEl.textContent;
         set(highlightedItem, "titleInnerEl.innerHTML", generateHighlightedText(match.value, match.indices));
