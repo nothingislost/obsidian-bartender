@@ -1,3 +1,4 @@
+import Fuse from "fuse.js";
 import { ChildElement } from "obsidian";
 
 export function getPreviousSiblings(el: HTMLElement, filter?: (el: HTMLElement) => boolean): HTMLElement[] {
@@ -108,7 +109,7 @@ export const highlight = (fuseSearchResult: any, highlightClassName: string = "s
         str[end] = `${str[end]}</span>`;
         return str;
       }, inputText.split(""))
-      .join("");
+      .join(""); // .replace(/.md$/, "");
 
     return result;
   };
@@ -118,7 +119,8 @@ export const highlight = (fuseSearchResult: any, highlightClassName: string = "s
     .map(({ item, matches }: any) => {
       const highlightedItem = { ...item };
       matches.forEach((match: any) => {
-        if (!highlightedItem.titleInnerEl.origContent) highlightedItem.titleInnerEl.origContent = highlightedItem.titleInnerEl.textContent;
+        if (!highlightedItem.titleInnerEl.origContent)
+          highlightedItem.titleInnerEl.origContent = highlightedItem.titleInnerEl.textContent;
         set(highlightedItem, "titleInnerEl.innerHTML", generateHighlightedText(match.value, match.indices));
         highlightedItem.titleInnerEl?.addClass("has-matches");
       });
@@ -126,3 +128,18 @@ export const highlight = (fuseSearchResult: any, highlightClassName: string = "s
       return highlightedItem;
     });
 };
+
+export function removeExt(obj: any) {
+  if (typeof obj === "string" || obj instanceof String) {
+    return obj.replace(/.md$/, "");
+  }
+  return obj;
+}
+
+export function getFn(obj: any, path: string[]) {
+  var value = Fuse.config.getFn(obj, path);
+  if (Array.isArray(value)) {
+    return value.map(el => removeExt(el));
+  }
+  return removeExt(value);
+}

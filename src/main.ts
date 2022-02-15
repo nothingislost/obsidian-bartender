@@ -1,9 +1,9 @@
+import Fuse from "fuse.js";
 import { around } from "monkey-around";
 import {
   ChildElement,
   FileExplorerHeader,
   FileExplorerView,
-  InfinityScroll,
   Platform,
   Plugin,
   RootElements,
@@ -17,27 +17,25 @@ import {
   WorkspaceItem,
   WorkspaceLeaf,
   WorkspaceSplit,
-  WorkspaceTabs,
+  WorkspaceTabs
 } from "obsidian";
 import Sortable, { MultiDrag } from "sortablejs";
 import { addSortButton, folderSort } from "./file-explorer/custom-sort";
 import { BartenderSettings, DEFAULT_SETTINGS, SettingTab } from "./settings/settings";
 import {
   generateId,
-  GenerateIdOptions,
-  getItems,
+  GenerateIdOptions, getFn, getItems,
   getNextSiblings,
   getPreviousSiblings,
   highlight,
-  reorderArray,
+  reorderArray
 } from "./utils";
-import Fuse from "fuse.js";
 
 Sortable.mount(new MultiDrag());
 
 const STATUS_BAR_SELECTOR = "body > div.app-container div.status-bar";
 const RIBBON_BAR_SELECTOR = "body > div.app-container div.side-dock-actions";
-const DRAG_DELAY = Platform.isMobile ? 200 : 20;
+const DRAG_DELAY = Platform.isMobile ? 200 : 200;
 const ANIMATION_DURATION = 500;
 
 export default class BartenderPlugin extends Plugin {
@@ -155,8 +153,10 @@ export default class BartenderPlugin extends Plugin {
         includeScore: true,
         includeMatches: true,
         useExtendedSearch: true,
-        threshold: 0.3,
-        keys: ["file.name", "file.path"],
+        getFn: getFn,
+        threshold: 0.1,
+        ignoreLocation: true,
+        keys: ["file.path"],
       };
       let flattenedItems = getItems(this.rootEl._children);
       const fuse = new Fuse(flattenedItems, options);
@@ -461,7 +461,7 @@ export default class BartenderPlugin extends Plugin {
     let sorter = Sortable.create(element, {
       group: "leftTabBar",
       dataIdAttr: "data-id",
-      delay: 0,
+      delay: Platform.isMobile ? 200 : this.settings.dragDelay,
       dropBubble: false,
       dragoverBubble: false,
       animation: ANIMATION_DURATION,
@@ -492,7 +492,7 @@ export default class BartenderPlugin extends Plugin {
       this.statusBarSorter = Sortable.create(el, {
         group: "statusBar",
         dataIdAttr: "data-id",
-        delay: DRAG_DELAY,
+        delay: Platform.isMobile ? 200 : this.settings.dragDelay,
         animation: ANIMATION_DURATION,
         onChoose: () => {
           Array.from(el.children).forEach(el => el.removeClass("is-hidden"));
@@ -522,7 +522,7 @@ export default class BartenderPlugin extends Plugin {
     let sortable = new Sortable(el, {
       group: "actionBar",
       dataIdAttr: "data-id",
-      delay: DRAG_DELAY,
+      delay: Platform.isMobile ? 200 : this.settings.dragDelay,
       sort: true,
       animation: ANIMATION_DURATION,
       onStart: () => {
@@ -549,7 +549,7 @@ export default class BartenderPlugin extends Plugin {
       this.ribbonBarSorter = Sortable.create(el, {
         group: "ribbonBar",
         dataIdAttr: "data-id",
-        delay: DRAG_DELAY,
+        delay: Platform.isMobile ? 200 : this.settings.dragDelay,
         animation: ANIMATION_DURATION,
         onChoose: () => {
           Array.from(el.children).forEach(el => el.removeClass("is-hidden"));
@@ -624,7 +624,7 @@ export default class BartenderPlugin extends Plugin {
         // @ts-ignore
         multiDragKey: "alt",
         // selectedClass: "is-selected",
-        delay: Platform.isMobile ? 200 : 0,
+        delay: Platform.isMobile ? 200 : this.settings.dragDelay,
         sort: dragEnabled, // init with dragging disabled. the nav bar button will toggle on/off
         animation: ANIMATION_DURATION,
         onStart: evt => {

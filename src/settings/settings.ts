@@ -8,6 +8,7 @@ export interface BartenderSettings {
   actionBarOrder: Record<string, string[]>;
   autoHide: boolean;
   autoHideDelay: number;
+  dragDelay: number;
 }
 
 export const DEFAULT_SETTINGS: BartenderSettings = {
@@ -17,6 +18,7 @@ export const DEFAULT_SETTINGS: BartenderSettings = {
   actionBarOrder: {},
   autoHide: false,
   autoHideDelay: 2000,
+  dragDelay: 200,
 };
 
 export class SettingTab extends PluginSettingTab {
@@ -36,7 +38,7 @@ export class SettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Auto Collapse")
-      .setDesc("Automatically hide items once your mouse leaves the icon container")
+      .setDesc("Automatically hide ribbon and status bar items once your mouse leaves the icon container")
       .addToggle(toggle =>
         toggle.setValue(this.plugin.settings.autoHide).onChange(value => {
           this.plugin.settings.autoHide = value;
@@ -46,13 +48,26 @@ export class SettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Auto Collapse Delay")
-      .setDesc("How long to wait before auto collapsing")
+      .setDesc("How long to wait before auto collapsing hidden icons on the ribbon and status bar")
       .addText(textfield => {
         textfield.setPlaceholder(String(2000));
         textfield.inputEl.type = "number";
         textfield.setValue(String(this.plugin.settings.autoHideDelay));
         textfield.onChange(async value => {
           this.plugin.settings.autoHideDelay = Number(value);
+          this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Drag Start Delay (ms)")
+      .setDesc("How long to wait before triggering the drag behavior after clicking. ⚠️ Requires an app restart.")
+      .addText(textfield => {
+        textfield.setPlaceholder(String(200));
+        textfield.inputEl.type = "number";
+        textfield.setValue(String(this.plugin.settings.dragDelay));
+        textfield.onChange(async value => {
+          this.plugin.settings.dragDelay = Number(value);
           this.plugin.saveSettings();
         });
       });
