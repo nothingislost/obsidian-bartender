@@ -2,6 +2,7 @@ import Fuse from "fuse.js";
 import { around } from "monkey-around";
 import {
   ChildElement,
+  Component,
   FileExplorerHeader,
   FileExplorerView,
   Platform,
@@ -17,18 +18,20 @@ import {
   WorkspaceItem,
   WorkspaceLeaf,
   WorkspaceSplit,
-  WorkspaceTabs
+  WorkspaceTabs,
 } from "obsidian";
 import Sortable, { MultiDrag } from "sortablejs";
 import { addSortButton, folderSort } from "./file-explorer/custom-sort";
 import { BartenderSettings, DEFAULT_SETTINGS, SettingTab } from "./settings/settings";
 import {
   generateId,
-  GenerateIdOptions, getFn, getItems,
+  GenerateIdOptions,
+  getFn,
+  getItems,
   getNextSiblings,
   getPreviousSiblings,
   highlight,
-  reorderArray
+  reorderArray,
 } from "./utils";
 
 Sortable.mount(new MultiDrag());
@@ -64,7 +67,7 @@ export default class BartenderPlugin extends Plugin {
 
   patchFileExplorerFolder() {
     let plugin = this;
-    let leaf = this.app.workspace.getLeaf();
+    let leaf = this.app.workspace.getLeaf(true);
     let fileExplorer = this.app.viewRegistry.viewByType["file-explorer"](leaf) as FileExplorerView;
     // @ts-ignore
     let tmpFolder = new TFolder(Vault, "");
@@ -83,6 +86,7 @@ export default class BartenderPlugin extends Plugin {
         },
       })
     );
+    leaf.detach();
   }
 
   initialize() {
@@ -624,7 +628,7 @@ export default class BartenderPlugin extends Plugin {
         // @ts-ignore
         multiDragKey: "alt",
         // selectedClass: "is-selected",
-        delay: Platform.isMobile ? 200 : this.settings.dragDelay,
+        delay: 0,
         sort: dragEnabled, // init with dragging disabled. the nav bar button will toggle on/off
         animation: ANIMATION_DURATION,
         onStart: evt => {
