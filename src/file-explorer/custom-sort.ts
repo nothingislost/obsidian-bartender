@@ -1,5 +1,5 @@
 import Fuse from "fuse.js";
-import { Menu, TAbstractFile, TFile, TFolder } from "obsidian";
+import { Menu, TAbstractFile, TFile, TFolder, requireApiVersion } from "obsidian";
 
 let Collator = new Intl.Collator(undefined, {
   usage: "sort",
@@ -72,10 +72,15 @@ export const folderSort = function (order: string[], foldersOnBottom?: boolean) 
       return (index1 > -1 ? index1 : Infinity) - (index2 > -1 ? index2 : Infinity);
     }
   });
-
-  this.children = folderContents
+  const items = folderContents
     .map((child: TAbstractFile) => fileExplorer.fileItems[child.path])
     .filter((f: TAbstractFile) => f);
+
+  if (requireApiVersion && requireApiVersion("0.15.0")) {
+    this.vChildren.setChildren(items);
+  } else {
+    this.children = items;
+  }
 };
 
 export const addSortButton = function (sorter: any, sortOption: any) {
