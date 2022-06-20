@@ -49,6 +49,7 @@ declare module "obsidian" {
     sortOrder: string;
     hasCustomSorter?: boolean;
     dragEnabled: boolean;
+    setSortOrder(order: String): void;
   }
   interface FileExplorerHeader {
     addSortButton(sorter: (sortType: string) => void, sortOrder: () => string): void;
@@ -66,10 +67,16 @@ declare module "obsidian" {
     filter: string;
     compute(): void;
   }
+  export interface VirtualChildren {
+    children: ChildElement[];
+    _children: ChildElement[];
+    owner: ChildElement
+  }
   export interface RootElements {
     childrenEl: HTMLElement;
     children: ChildElement[];
     _children: ChildElement[];
+    vChildren: VirtualChildren;
     file: TAbstractFile;
     sorter: Sortable;
     fileExplorer: FileExplorerView;
@@ -81,6 +88,7 @@ declare module "obsidian" {
     titleEl: HTMLElement;
     titleInnerEl: HTMLElement;
     children?: ChildElement[];
+    vChildren: VirtualChildren;
     childrenEl?: HTMLElement;
     sorter?: Sortable;
   }

@@ -19,6 +19,7 @@ import {
   WorkspaceLeaf,
   WorkspaceSplit,
   WorkspaceTabs,
+  requireApiVersion,
 } from "obsidian";
 import Sortable, { MultiDrag } from "sortablejs";
 import { addSortButton, folderSort } from "./file-explorer/custom-sort";
@@ -642,8 +643,10 @@ export default class BartenderPlugin extends Plugin {
           // TODO: Refactor this
           // Responsible for updating the internal Obsidian array that contains the file item order
           // Without this logic, reordering is ephemeral and will be undone by Obisidian's native processes
-          if (!root.children || !draggedItems?.length) return;
-          let children = root.children.map(child => child.el);
+          const supportsVirtualChildren = requireApiVersion && requireApiVersion("0.15.0");
+          let _children = supportsVirtualChildren ? root.vChildren?._children : root.children;
+          if (!_children || !draggedItems?.length) return;
+          let children = _children.map(child => child.el);
           let adjacentEl = evt.related;
           let targetIndex = children.indexOf(adjacentEl);
           let firstItem = draggedItems.first();
@@ -652,10 +655,10 @@ export default class BartenderPlugin extends Plugin {
           if (firstItemIndex > targetIndex) _draggedItems.reverse();
           for (let item of _draggedItems) {
             let itemIndex = children.indexOf(item);
-            root.children = reorderArray(root.children, itemIndex, targetIndex);
+            _children = reorderArray(_children, itemIndex, targetIndex);
             children = reorderArray(children, itemIndex, targetIndex);
           }
-          this.settings.fileExplorerOrder[root.file.path] = root.children.map(child => child.file.path);
+          this.settings.fileExplorerOrder[root.file.path] = _children.map(child => child.file.path);
           this.saveSettings();
           // return !adjacentEl.hasClass("nav-folder");
         },
@@ -683,8 +686,12 @@ export default class BartenderPlugin extends Plugin {
 
   traverseRoots(root: RootElements | ChildElement, items?: [RootElements | ChildElement]) {
     if (!items) items = [root];
-    for (let child of root.children || []) {
-      if (child.children) items.push(child);
+    const supportsVirtualChildren = requireApiVersion && requireApiVersion("0.15.0");
+    const _children = supportsVirtualChildren ? root.vChildren?._children : root.children;
+    for (let child of _children || []) {
+      if (child.children || child.vChildren?._children) {
+        items.push(child);
+      }
       this.traverseRoots(child, items);
     }
     return items;
@@ -724,6 +731,11 @@ export default class BartenderPlugin extends Plugin {
       }
     }
     delete fileExplorer.hasCustomSorter;
+
+    // unset "custom" file explorer sort
+    if (this.app.vault.getConfig("fileSortOrder") === "custom") {
+      fileExplorer.setSortOrder("alphabetical");
+    }
   }
 
   onunload(): void {
@@ -745,6 +757,7 @@ export default class BartenderPlugin extends Plugin {
         }
       }
     });
+
     // clean up file explorer sorters
     this.cleanupFileExplorerSorters();
   }

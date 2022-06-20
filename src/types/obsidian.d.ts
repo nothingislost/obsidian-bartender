@@ -12,6 +12,10 @@ declare module "obsidian" {
       ctx?: any
     ): EventRef;
   }
+  interface Vault {
+    getConfig(config: String): unknown;
+    setConfig(config: String, value: any): void;
+  }
   interface View {
     actionsEl: HTMLElement;
     iconSorter?: Sortable;
