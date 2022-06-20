@@ -145,13 +145,15 @@ export default class BartenderPlugin extends Plugin {
   }
 
   fileExplorerFilter = function () {
+    const supportsVirtualChildren = requireApiVersion && requireApiVersion("0.15.0");
     let fileExplorer = this?.rootEl?.fileExplorer;
+    const _children = supportsVirtualChildren ? this.rootEl.vChildren._children : this.rootEl.children;
 
     if (!fileExplorer) return;
 
     if (this.filter?.length >= 1) {
       if (!this.filtered) {
-        this.rootEl._children = this.rootEl.children;
+        this.rootEl._children = _children;
         this.filtered = true;
       }
       const options = {
@@ -167,10 +169,18 @@ export default class BartenderPlugin extends Plugin {
       const fuse = new Fuse(flattenedItems, options);
       const maxResults = 200;
       let results = fuse.search(this.filter).slice(0, maxResults);
-      this.rootEl.children = highlight(results);
+      if (supportsVirtualChildren) {
+        this.rootEl.vChildren._children = highlight(results);
+      } else {
+        this.rootEl.children = highlight(results);
+      }
     } else if (this.filter?.length < 1 && this.filtered) {
       if (this.rootEl._children) {
-        this.rootEl.children = this.rootEl._children;
+        if (supportsVirtualChildren) {
+          this.rootEl.vChildren._children = this.rootEl._children;
+        } else {
+          this.rootEl.children = this.rootEl._children;
+        }
       }
 
       let flattenedItems = getItems(this.rootEl._children);

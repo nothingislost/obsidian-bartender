@@ -1,5 +1,5 @@
 import Fuse from "fuse.js";
-import { ChildElement } from "obsidian";
+import { ChildElement, requireApiVersion } from "obsidian";
 
 export function getPreviousSiblings(el: HTMLElement, filter?: (el: HTMLElement) => boolean): HTMLElement[] {
   var sibs = [];
@@ -73,17 +73,32 @@ export function reorderArray(array: any[], from: number, to: number, on = 1) {
 
 export const getItems = (items: ChildElement[]): ChildElement[] => {
   let children: any[] = [];
-
-  return items
-    .reduce((res, item) => {
-      if (item.children) {
-        if (item.children.length) children = [...children, ...item.children];
-      } else {
-        res.push(item);
-      }
-      return res;
-    }, [] as ChildElement[])
-    .concat(children.length ? getItems(children) : children);
+  const supportsVirtualChildren = requireApiVersion && requireApiVersion("0.15.0");
+  let _items;
+  if (supportsVirtualChildren) {
+    _items = items
+      .reduce((res, item) => {
+        if (item.vChildren?._children) {
+          children = [...children, ...item.vChildren._children];
+        } else {
+          res.push(item);
+        }
+        return res;
+      }, [] as ChildElement[])
+      .concat(children.length ? getItems(children) : children);
+  } else {
+    _items = items
+      .reduce((res, item) => {
+        if (item.children) {
+          children = [...children, ...item.children];
+        } else {
+          res.push(item);
+        }
+        return res;
+      }, [] as ChildElement[])
+      .concat(children.length ? getItems(children) : children);
+  }
+  return _items;
 };
 
 // highlight fuzzy filter matches
