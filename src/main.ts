@@ -21,6 +21,7 @@ import {
   WorkspaceTabs,
   requireApiVersion,
 } from "obsidian";
+
 import Sortable, { MultiDrag } from "sortablejs";
 import { addSortButton, folderSort } from "./file-explorer/custom-sort";
 import { BartenderSettings, DEFAULT_SETTINGS, SettingTab } from "./settings/settings";
@@ -101,13 +102,15 @@ export default class BartenderPlugin extends Plugin {
             this.setStatusBarSorter();
 
             // add sorter to the sidebar tabs
-            let left = (this.app.workspace.leftSplit as WorkspaceSplit).children;
-            let right = (this.app.workspace.rightSplit as WorkspaceSplit).children;
-            left.concat(right).forEach(child => {
-              if (child.hasOwnProperty("tabsInnerEl") && !child.iconSorter) {
-                child.iconSorter = this.setTabBarSorter(child.tabsInnerEl, child);
-              }
-            });
+            if (requireApiVersion && !requireApiVersion("0.15.3")) {
+              let left = (this.app.workspace.leftSplit as WorkspaceSplit).children;
+              let right = (this.app.workspace.rightSplit as WorkspaceSplit).children;
+              left.concat(right).forEach(child => {
+                if (child.hasOwnProperty("tabsInnerEl") && !child.iconSorter) {
+                  child.iconSorter = this.setTabBarSorter(child.tabsInnerEl, child);
+                }
+              });
+            }
           }
 
           // add file explorer sorter
@@ -224,7 +227,9 @@ export default class BartenderPlugin extends Plugin {
       this.app.workspace.on("bartender-leaf-split", (originLeaf: WorkspaceItem, newLeaf: WorkspaceItem) => {
         let element: HTMLElement = newLeaf.tabsInnerEl as HTMLElement;
         if (newLeaf.type === "tabs" && newLeaf instanceof WorkspaceTabs) {
-          this.setTabBarSorter(element, newLeaf);
+          if (requireApiVersion && !requireApiVersion("0.15.3")) {
+            this.setTabBarSorter(element, newLeaf);
+          }
         }
       })
     );
