@@ -481,6 +481,7 @@ export default class BartenderPlugin extends Plugin {
     let sorter = Sortable.create(element, {
       group: "leftTabBar",
       dataIdAttr: "data-id",
+      chosenClass: "bt-sortable-chosen",
       delay: Platform.isMobile ? 200 : this.settings.dragDelay,
       dropBubble: false,
       dragoverBubble: false,
@@ -512,6 +513,7 @@ export default class BartenderPlugin extends Plugin {
       this.statusBarSorter = Sortable.create(el, {
         group: "statusBar",
         dataIdAttr: "data-id",
+        chosenClass: "bt-sortable-chosen",
         delay: Platform.isMobile ? 200 : this.settings.dragDelay,
         animation: ANIMATION_DURATION,
         onChoose: () => {
@@ -542,6 +544,7 @@ export default class BartenderPlugin extends Plugin {
     let sortable = new Sortable(el, {
       group: "actionBar",
       dataIdAttr: "data-id",
+      chosenClass: "bt-sortable-chosen",
       delay: Platform.isMobile ? 200 : this.settings.dragDelay,
       sort: true,
       animation: ANIMATION_DURATION,
@@ -570,6 +573,7 @@ export default class BartenderPlugin extends Plugin {
         group: "ribbonBar",
         dataIdAttr: "data-id",
         delay: Platform.isMobile ? 200 : this.settings.dragDelay,
+        chosenClass: "bt-sortable-chosen",
         animation: ANIMATION_DURATION,
         onChoose: () => {
           Array.from(el.children).forEach(el => el.removeClass("is-hidden"));
@@ -640,11 +644,14 @@ export default class BartenderPlugin extends Plugin {
         : false;
       root.sorter = Sortable.create(el!, {
         group: "fileExplorer" + root.file.path,
+        forceFallback: true,
         multiDrag: true,
         // @ts-ignore
         multiDragKey: "alt",
         // selectedClass: "is-selected",
+        chosenClass: "bt-sortable-chosen",
         delay: 0,
+        disabled: !dragEnabled,
         sort: dragEnabled, // init with dragging disabled. the nav bar button will toggle on/off
         animation: ANIMATION_DURATION,
         onStart: evt => {
@@ -719,6 +726,7 @@ export default class BartenderPlugin extends Plugin {
       for (let root of roots) {
         if (root.sorter) {
           root.sorter.option("sort", enable);
+          root.sorter.option("disabled", !enable);
         }
       }
     }
