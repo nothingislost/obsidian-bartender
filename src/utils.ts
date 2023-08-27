@@ -134,10 +134,10 @@ export const highlight = (fuseSearchResult: any, highlightClassName: string = "s
     .map(({ item, matches }: any) => {
       const highlightedItem = { ...item };
       matches.forEach((match: any) => {
-        if (!highlightedItem.titleInnerEl.origContent)
-          highlightedItem.titleInnerEl.origContent = highlightedItem.titleInnerEl.textContent;
-        set(highlightedItem, "titleInnerEl.innerHTML", generateHighlightedText(match.value, match.indices));
-        highlightedItem.titleInnerEl?.addClass("has-matches");
+        if (!highlightedItem.innerEl.origContent)
+          highlightedItem.innerEl.origContent = highlightedItem.innerEl.textContent;
+        set(highlightedItem, "innerEl.innerHTML", generateHighlightedText(match.value, match.indices));
+        highlightedItem.innerEl?.addClass("has-matches");
       });
 
       return highlightedItem;

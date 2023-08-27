@@ -150,10 +150,9 @@ export default class BartenderPlugin extends Plugin {
   fileExplorerFilter = function () {
     const supportsVirtualChildren = requireApiVersion && requireApiVersion("0.15.0");
     let fileExplorer = this?.rootEl?.fileExplorer;
-    const _children = supportsVirtualChildren ? this.rootEl.vChildren._children : this.rootEl.children;
-
     if (!fileExplorer) return;
-
+    const _children = supportsVirtualChildren ? this.rootEl?.vChildren._children : this.rootEl?.children;
+    if (!_children) return;
     if (this.filter?.length >= 1) {
       if (!this.filtered) {
         this.rootEl._children = _children;
@@ -188,10 +187,10 @@ export default class BartenderPlugin extends Plugin {
 
       let flattenedItems = getItems(this.rootEl._children);
       flattenedItems.map((match: ChildElement) => {
-        if ((<any>match).titleInnerEl.origContent) {
-          match.titleInnerEl.setText((<any>match).titleInnerEl.origContent);
-          delete (<any>match).titleInnerEl.origContent;
-          match.titleInnerEl.removeClass("has-matches");
+        if ((<any>match).innerEl.origContent) {
+          match.innerEl.setText((<any>match).innerEl.origContent);
+          delete (<any>match).innerEl.origContent;
+          match.innerEl.removeClass("has-matches");
         }
       });
 
@@ -400,7 +399,9 @@ export default class BartenderPlugin extends Plugin {
                 if (this.scrollEl.hasClass("nav-files-container")) {
                   plugin.fileExplorerFilter.call(this);
                 }
-              } catch {}
+              } catch (err) {
+                console.log(err)
+              }
               const result = old.call(this, ...args);
               return result;
             };

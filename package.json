@@ -1,6 +1,6 @@
 {
   "name": "obsidian-bartender",
-  "version": "0.4.0",
+  "version": "0.5.8",
   "description": "Allows for rearranging the elements in the status bar and sidebar ribbon",
   "main": "main.js",
   "scripts": {
