@@ -8,6 +8,7 @@ import {
   Platform,
   Plugin,
   RootElements,
+  Scope,
   setIcon,
   SplitDirection,
   TFolder,
@@ -605,6 +606,13 @@ export default class BartenderPlugin extends Plugin {
       fileExplorerFilterInput.placeholder = "Type to filter...";
       fileExplorerFilterInput.type = "text";
       fileExplorerFilter.hide();
+      let filterScope = new Scope(this.app.scope);
+      fileExplorerFilterInput.onfocus = () => {
+        this.app.keymap.pushScope(filterScope);
+      }
+      fileExplorerFilterInput.onblur = () => {
+        this.app.keymap.popScope(filterScope);
+      }
       fileExplorerFilterInput.oninput = (ev: InputEvent) => {
         let fileExplorer = this.getFileExplorer();
         if (ev.target instanceof HTMLInputElement) {
