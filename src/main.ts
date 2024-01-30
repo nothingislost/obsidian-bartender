@@ -99,7 +99,7 @@ export default class BartenderPlugin extends Plugin {
         () => {
           if (Platform.isDesktop) {
             // add sorter to the status bar
-            this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true, 16);
+            // this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true, 16);
             this.setStatusBarSorter();
 
             // add sorter to the sidebar tabs
@@ -118,7 +118,7 @@ export default class BartenderPlugin extends Plugin {
           this.setFileExplorerSorter();
 
           // add sorter to the left sidebar ribbon
-          this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false, 18);
+          // this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false, 18);
           this.setRibbonBarSorter();
 
           // add sorter to all view actions icon groups
@@ -389,7 +389,7 @@ export default class BartenderPlugin extends Plugin {
   patchFileExplorer(fileExplorer: FileExplorerView) {
     let plugin = this;
     if (fileExplorer) {
-      let InfinityScroll = fileExplorer.dom.infinityScroll.constructor;
+      let InfinityScroll = fileExplorer.tree?.infinityScroll?.constructor;
       // register clear first so that it gets called first onunload
       this.register(() => this.clearFileExplorerFilter());
       this.register(
@@ -710,7 +710,7 @@ export default class BartenderPlugin extends Plugin {
   getRootFolders(fileExplorer?: FileExplorerView): [RootElements | ChildElement] | undefined {
     if (!fileExplorer) fileExplorer = this.getFileExplorer();
     if (!fileExplorer) return;
-    let root = fileExplorer.dom?.infinityScroll?.rootEl;
+    let root = fileExplorer.tree?.infinityScroll?.rootEl;
     let roots = root && this.traverseRoots(root);
     return roots;
   }

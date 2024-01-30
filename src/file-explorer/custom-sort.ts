@@ -83,8 +83,9 @@ export const folderSort = function (order: string[], foldersOnBottom?: boolean) 
   }
 };
 
-export const addSortButton = function (sorter: any, sortOption: any) {
+export const addSortButton = function (sorterArray: any, sortOption: any, sorter:any,currentSort:any) {
   let plugin = this;
+  console.log('currentSort',currentSort())
   let sortEl = this.addNavButton(
     SortGlyph,
     Translate("plugins.file-explorer.action-change-sort"),
@@ -92,7 +93,7 @@ export const addSortButton = function (sorter: any, sortOption: any) {
       event.preventDefault();
       let menu = new Menu(plugin.app);
       for (
-        let currentSortOption = sortOption(), groupIndex = 0, _sortOptionGroups = sortOptionGroups;
+        let currentSortOption = currentSort(), groupIndex = 0, _sortOptionGroups = sortOptionGroups;
         groupIndex < _sortOptionGroups.length;
         groupIndex++
       ) {
@@ -125,7 +126,7 @@ export const addSortButton = function (sorter: any, sortOption: any) {
     }
   );
   setTimeout(() => {
-    sortEl.setAttribute("data-sort-method", sortOption());
+    sortEl.setAttribute("data-sort-method", sorter(currentSort()));
   }, 100);
   this.addNavButton("three-horizontal-bars", "Drag to rearrange", function (event: MouseEvent) {
     event.preventDefault();
