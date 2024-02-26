@@ -80,7 +80,7 @@ export default class BartenderPlugin extends Plugin {
         sort(old: any) {
           return function (...args: any[]) {
             let order = plugin.settings.fileExplorerOrder[this.file.path];
-            if (this.fileExplorer.sortOrder === "custom") {
+            if (this.view?.sortOrder === "custom") {
               return folderSort.call(this, order, ...args);
             } else {
               return old.call(this, ...args);

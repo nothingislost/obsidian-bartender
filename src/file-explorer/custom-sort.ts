@@ -50,7 +50,7 @@ const sortOptionGroups = [
 ];
 
 export const folderSort = function (order: string[], foldersOnBottom?: boolean) {
-  let fileExplorer = this.fileExplorer,
+  let fileExplorer = this.view,
     folderContents = this.file.children.slice();
   folderContents.sort(function (firstEl: TFile | TFolder, secondEl: TFile | TFolder) {
     let firstIsFolder, secondIsFolder;
