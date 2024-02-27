@@ -149,8 +149,13 @@ export default class BartenderPlugin extends Plugin {
   }
 
   fileExplorerFilter = function () {
+
     const supportsVirtualChildren = requireApiVersion && requireApiVersion("0.15.0");
-    let fileExplorer = this?.rootEl?.fileExplorer;
+    let leaf = this?.rootEl?.view?.app.workspace.getLeaf(true);
+    let fileExplorer = this?.rootEl?.view?.app.viewRegistry.viewByType["file-explorer"](leaf) as FileExplorerView;
+
+    //let fileExplorer = this?.rootEl?.fileExplorer;
+
     if (!fileExplorer) return;
     const _children = supportsVirtualChildren ? this.rootEl?.vChildren._children : this.rootEl?.children;
     if (!_children) return;
