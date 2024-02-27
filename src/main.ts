@@ -148,11 +148,11 @@ export default class BartenderPlugin extends Plugin {
     fileExplorer.tree.infinityScroll.compute();
   }
 
-  fileExplorerFilter = function () {
+  fileExplorerFilter = function (fileExplorer:FileExplorerView) {
 
     const supportsVirtualChildren = requireApiVersion && requireApiVersion("0.15.0");
-    let leaf = this?.rootEl?.view?.app.workspace.getLeaf(true);
-    let fileExplorer = this?.rootEl?.view?.app.viewRegistry.viewByType["file-explorer"](leaf) as FileExplorerView;
+/*    let leaf = this?.rootEl?.view?.app.workspace.getLeaf(true);
+    let fileExplorer = this?.rootEl?.view?.app.viewRegistry.viewByType["file-explorer"](leaf) as FileExplorerView;*/
 
     //let fileExplorer = this?.rootEl?.fileExplorer;
 
@@ -406,7 +406,7 @@ export default class BartenderPlugin extends Plugin {
             return function (...args: any[]) {
               try {
                 if (this.scrollEl.hasClass("nav-files-container")) {
-                  plugin.fileExplorerFilter.call(this);
+                  plugin.fileExplorerFilter.call(this,fileExplorer);
                 }
               } catch (err) {
                 console.log(err)
