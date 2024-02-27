@@ -44,6 +44,7 @@ declare module "obsidian" {
   }
   export interface FileExplorerView extends View {
     dom: FileExplorerViewDom;
+    tree: FileExplorerViewDom;
     createFolderDom(folder: TFolder): FileExplorerFolder;
     headerDom: FileExplorerHeader;
     sortOrder: string;
