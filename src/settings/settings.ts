@@ -9,6 +9,7 @@ export interface BartenderSettings {
   autoHide: boolean;
   autoHideDelay: number;
   dragDelay: number;
+  sortOrder:string;
 }
 
 export const DEFAULT_SETTINGS: BartenderSettings = {
@@ -19,6 +20,7 @@ export const DEFAULT_SETTINGS: BartenderSettings = {
   autoHide: false,
   autoHideDelay: 2000,
   dragDelay: 200,
+    sortOrder: "alphabetical"
 };
 
 export class SettingTab extends PluginSettingTab {
