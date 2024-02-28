@@ -70,8 +70,8 @@ export default class BartenderPlugin extends Plugin {
 
   patchFileExplorerFolder() {
     let plugin = this;
-    let leaf = this.app.workspace.getLeaf(true);
-    let fileExplorer = this.app.viewRegistry.viewByType["file-explorer"](leaf) as FileExplorerView;
+    let leaf = plugin.app.workspace.getLeaf(true);
+    let fileExplorer = plugin.app.viewRegistry.viewByType["file-explorer"](leaf) as FileExplorerView;
     // @ts-ignore
     let tmpFolder = new TFolder(Vault, "");
     let Folder = fileExplorer.createFolderDom(tmpFolder).constructor;
@@ -80,7 +80,7 @@ export default class BartenderPlugin extends Plugin {
         sort(old: any) {
           return function (...args: any[]) {
             let order = plugin.settings.fileExplorerOrder[this.file.path];
-            if (this.view?.sortOrder === "custom") {
+            if (plugin.settings.sortOrder === "custom") {
               return folderSort.call(this, order, ...args);
             } else {
               return old.call(this, ...args);
@@ -99,7 +99,7 @@ export default class BartenderPlugin extends Plugin {
         () => {
           if (Platform.isDesktop) {
             // add sorter to the status bar
-            // this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true, 16);
+            this.insertSeparator(STATUS_BAR_SELECTOR, "status-bar-item", true, 16);
             this.setStatusBarSorter();
 
             // add sorter to the sidebar tabs
@@ -118,7 +118,7 @@ export default class BartenderPlugin extends Plugin {
           this.setFileExplorerSorter();
 
           // add sorter to the left sidebar ribbon
-          // this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false, 18);
+          this.insertSeparator(RIBBON_BAR_SELECTOR, "side-dock-ribbon-action", false, 18);
           this.setRibbonBarSorter();
 
           // add sorter to all view actions icon groups
@@ -144,13 +144,18 @@ export default class BartenderPlugin extends Plugin {
       '.workspace-leaf-content[data-type="file-explorer"] .search-input-container > input'
     );
     fileExplorerFilterEl && (fileExplorerFilterEl.value = "");
-    fileExplorer.dom.infinityScroll.filter = "";
-    fileExplorer.dom.infinityScroll.compute();
+    fileExplorer.tree.infinityScroll.filter = "";
+    fileExplorer.tree.infinityScroll.compute();
   }
 
-  fileExplorerFilter = function () {
+  fileExplorerFilter = function (fileExplorer:FileExplorerView) {
+
     const supportsVirtualChildren = requireApiVersion && requireApiVersion("0.15.0");
-    let fileExplorer = this?.rootEl?.fileExplorer;
+/*    let leaf = this?.rootEl?.view?.app.workspace.getLeaf(true);
+    let fileExplorer = this?.rootEl?.view?.app.viewRegistry.viewByType["file-explorer"](leaf) as FileExplorerView;*/
+
+    //let fileExplorer = this?.rootEl?.fileExplorer;
+
     if (!fileExplorer) return;
     const _children = supportsVirtualChildren ? this.rootEl?.vChildren._children : this.rootEl?.children;
     if (!_children) return;
@@ -207,6 +212,8 @@ export default class BartenderPlugin extends Plugin {
     );
     this.registerEvent(
       this.app.workspace.on("file-explorer-sort-change", (sortMethod: string) => {
+        this.settings.sortOrder = sortMethod
+        this.saveSettings();
         if (sortMethod === "custom") {
           setTimeout(() => {
             this.setFileExplorerSorter();
@@ -388,8 +395,9 @@ export default class BartenderPlugin extends Plugin {
 
   patchFileExplorer(fileExplorer: FileExplorerView) {
     let plugin = this;
+    let settings = this.settings
     if (fileExplorer) {
-      let InfinityScroll = fileExplorer.tree?.infinityScroll?.constructor;
+      let InfinityScroll = fileExplorer.tree.infinityScroll.constructor;
       // register clear first so that it gets called first onunload
       this.register(() => this.clearFileExplorerFilter());
       this.register(
@@ -398,7 +406,7 @@ export default class BartenderPlugin extends Plugin {
             return function (...args: any[]) {
               try {
                 if (this.scrollEl.hasClass("nav-files-container")) {
-                  plugin.fileExplorerFilter.call(this);
+                  plugin.fileExplorerFilter.call(this,fileExplorer);
                 }
               } catch (err) {
                 console.log(err)
@@ -415,7 +423,7 @@ export default class BartenderPlugin extends Plugin {
             return function (...args: any[]) {
               if (this.navHeaderEl?.parentElement?.dataset?.type === "file-explorer") {
                 plugin.setFileExplorerFilter(this);
-                return addSortButton.call(this, ...args);
+                return addSortButton.call(this,settings, ...args);
               } else {
                 return old.call(this, ...args);
               }
@@ -621,9 +629,9 @@ export default class BartenderPlugin extends Plugin {
           } else {
             clearButtonEl.hide();
           }
-          fileExplorer.dom.infinityScroll.filter = ev.target.value;
+          fileExplorer.tree.infinityScroll.filter = ev.target.value;
         }
-        fileExplorer.dom.infinityScroll.compute();
+        fileExplorer.tree.infinityScroll.compute();
       };
       let clearButtonEl = fileExplorerFilter.createDiv("search-input-clear-button", function (el) {
         el.addEventListener("click", function () {
@@ -640,7 +648,7 @@ export default class BartenderPlugin extends Plugin {
     // TODO: Register sorter on new folder creation
     // TODO: Unregister sorter on folder deletion
     if (!fileExplorer) fileExplorer = this.getFileExplorer();
-    if (!fileExplorer || fileExplorer.sortOrder !== "custom" || fileExplorer.hasCustomSorter) return;
+    if (!fileExplorer || this.settings.sortOrder !== "custom" || fileExplorer.hasCustomSorter) return;
     let roots = this.getRootFolders(fileExplorer);
     if (!roots || !roots.length) return;
     for (let root of roots) {
@@ -763,7 +771,6 @@ export default class BartenderPlugin extends Plugin {
       }
     }
     delete fileExplorer.hasCustomSorter;
-
     // unset "custom" file explorer sort
     if (this.app.vault.getConfig("fileSortOrder") === "custom") {
       fileExplorer.setSortOrder("alphabetical");

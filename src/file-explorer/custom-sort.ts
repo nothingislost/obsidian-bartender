@@ -1,5 +1,6 @@
 import Fuse from "fuse.js";
-import { Menu, TAbstractFile, TFile, TFolder, requireApiVersion } from "obsidian";
+import {Menu, TAbstractFile, TFile, TFolder, requireApiVersion, FileExplorerView} from "obsidian";
+import {BartenderSettings} from "../settings/settings";
 
 let Collator = new Intl.Collator(undefined, {
   usage: "sort",
@@ -83,17 +84,16 @@ export const folderSort = function (order: string[], foldersOnBottom?: boolean) 
   }
 };
 
-export const addSortButton = function (sorterArray: any, sortOption: any, sorter:any,currentSort:any) {
+export const addSortButton = function (settings:BartenderSettings, sorter: any, sortOption: any,setSortOrder:any,currentSort:any) {
   let plugin = this;
-  console.log('currentSort',currentSort())
   let sortEl = this.addNavButton(
     SortGlyph,
     Translate("plugins.file-explorer.action-change-sort"),
     function (event: MouseEvent) {
       event.preventDefault();
-      let menu = new Menu(plugin.app);
+      let menu = new Menu();
       for (
-        let currentSortOption = currentSort(), groupIndex = 0, _sortOptionGroups = sortOptionGroups;
+        let currentSortOption = settings.sortOrder, groupIndex = 0, _sortOptionGroups = sortOptionGroups;
         groupIndex < _sortOptionGroups.length;
         groupIndex++
       ) {
@@ -109,7 +109,7 @@ export const addSortButton = function (sorterArray: any, sortOption: any, sorter
                       sortEl.setAttribute("data-sort-method", _sortOption);
                       plugin.app.workspace.trigger("file-explorer-sort-change", _sortOption);
                     }
-                    sorter(_sortOption);
+                    setSortOrder(_sortOption);
                   });
               });
             },
@@ -126,7 +126,7 @@ export const addSortButton = function (sorterArray: any, sortOption: any, sorter
     }
   );
   setTimeout(() => {
-    sortEl.setAttribute("data-sort-method", sorter(currentSort()));
+    sortEl.setAttribute("data-sort-method", settings.sortOrder);
   }, 100);
   this.addNavButton("three-horizontal-bars", "Drag to rearrange", function (event: MouseEvent) {
     event.preventDefault();
